@@ -14,10 +14,10 @@ const CATEGORY_LABELS = {
 };
 
 const SORT_OPTIONS = [
-  { value: 'popular', label: 'Сначала популярные', emoji: config.assets.sortIcons.popular },
-  { value: 'cheap', label: 'Сначала дешёвые', emoji: config.assets.sortIcons.cheap },
-  { value: 'expensive', label: 'Сначала дорогие', emoji: config.assets.sortIcons.expensive },
-  { value: 'new', label: 'Сначала новые', emoji: config.assets.sortIcons.new },
+  { value: 'popular', label: 'Сначала популярные', emoji: config.sortIcons.popular },
+  { value: 'cheap', label: 'Сначала дешёвые', emoji: config.sortIcons.cheap },
+  { value: 'expensive', label: 'Сначала дорогие', emoji: config.sortIcons.expensive },
+  { value: 'new', label: 'Сначала новые', emoji: config.sortIcons.new },
 ];
 
 const SORT_COMPARATORS = {

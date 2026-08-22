@@ -28,13 +28,11 @@ npm start                 # запускает бота
 
 **Команды:** `/ping` `/balance` `/give` `/timely` `/profile` `/shop` `/buy` `/inventory`
 `/use` `/sell` `/leaderboard` `/transactions` `/coinflip` `/dice` `/duel` `/blackjack`
-`/gifts` (send/list/hide) `/marry` `/report` `/battle` `/rep` `/kiss` `/hug` `/pat`
+`/gifts` (send/list/hide) `/marry` `/report` `/rep` `/kiss` `/hug` `/pat`
 `/cuddle` `/slap` `/tickle` `/poke` `/highfive` `/eco` (админ: give/remove/set/reset/balance)
 
-29 команд. Это весь Economy из мастер-промпта плюс `/dice`, `/gifts hide`, `/battle`
-(Mog Battle-эквивалент), и соц-модули (`/marry`, реакции, `/rep`) — держим их в одном
-боте, как у XIVIVIDE их "Economy" бот тоже совмещает деньги и соц-фан. `/report`
-тоже здесь по прямому запросу.
+28 команд. `/battle` (Mog Battle-эквивалент) убран отсюда — это отдельный
+fun/social-бот, не Economy.
 
 **Убрано отсюда специально:** `/avatar` `/banner` `/userinfo` `/serverinfo` `/poll` —
 это Core/Utility, не Economy, будут отдельным ботом, когда до него дойдём по плану.
@@ -98,6 +96,22 @@ npm start                 # запускает бота
 добавить их как application emoji своему боту.
 
 ## Дальше по плану
+
+1. Canvas-профиль.
+2. Moderation-бот.
+3. Отдельный fun/social-бот — туда уедет `/battle` и всё, что не про экономику.
+4. Остальные боты по списку (Security, Tickets, Giveaways, Levels, Voice, Utility, Clans).
+5. `/app` — Discord Activity (отдельный веб-проект, ~8-10 недель) — самое последнее.
+
+## Про "Unknown interaction" (DiscordAPIError 10062)
+
+Если видишь эту ошибку в логах — это почти всегда **не баг кода**, а сеть: Discord даёт
+всего 3 секунды на подтверждение команды (`deferReply`), и если запрос физически не
+успевает дойти до Discord за это время (слабый сигнал, VPN добавляет задержку) —
+токен считается истёкшим. Проверено: обработчики событий регистрируются ровно один
+раз (`grep client.on/once` в `index.js` подтверждает), дублирования в коде нет.
+Если это происходит стабильно — попробуй отключить VPN или проверить на Wi-Fi;
+если пропадает — дело было в скорости соединения, а не в боте.
 
 1. Canvas-профиль.
 2. Moderation-бот.
