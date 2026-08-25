@@ -1,6 +1,7 @@
-const { SlashCommandBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType } = require('discord.js');
+const { SlashCommandBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType, AttachmentBuilder } = require('discord.js');
 const { duelService, DuelNotPendingError } = require('../services/DuelService');
 const { transactionService, InsufficientFundsError } = require('../services/TransactionService');
+const { generateDuelGif } = require('../services/AnimatedGifService');
 const { baseEmbed, errorEmbed, DIVIDER, COIN_ICON } = require('../utils/embeds');
 const config = require('../config');
 
@@ -102,10 +103,20 @@ module.exports = {
       { name: 'VS', value: '⚔️', inline: true },
       { name: 'Справа', value: `${opponent}`, inline: true }
     );
-    if (config.assets.duelGifUrl) {
-      startedEmbed.setImage(config.assets.duelGifUrl);
+
+    // Если в .env задана своя гифка — используем её (приоритет над сгенерированной).
+    // Иначе рисуем свою собственную анимацию сами — оригинальную, без чужих ассетов.
+    const customDuelGifUrl = config.assets.pickRandomGif(config.assets.duelGifUrls);
+    let files = [];
+    if (customDuelGifUrl) {
+      startedEmbed.setImage(customDuelGifUrl);
+    } else {
+      const gifBuffer = generateDuelGif();
+      const attachment = new AttachmentBuilder(gifBuffer, { name: 'duel.gif' });
+      startedEmbed.setImage('attachment://duel.gif');
+      files = [attachment];
     }
-    await choice.update({ content: null, embeds: [startedEmbed], components: [] });
+    await choice.update({ content: null, embeds: [startedEmbed], components: [], files });
 
     try {
       const { winnerId, loserId, pot } = await duelService.acceptDuel(duel._id);

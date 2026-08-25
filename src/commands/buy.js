@@ -1,6 +1,8 @@
 const { SlashCommandBuilder } = require('discord.js');
 const { itemService, ItemNotFoundError } = require('../services/ItemService');
 const { transactionService, InsufficientFundsError, DuplicateActionError } = require('../services/TransactionService');
+const { roleAutomationService } = require('../services/RoleAutomationService');
+const Item = require('../models/Item');
 const { baseEmbed, errorEmbed, DIVIDER, COIN_ICON, DONATE_ICON } = require('../utils/embeds');
 const config = require('../config');
 
@@ -31,6 +33,16 @@ module.exports = {
     await interaction.deferReply({ ephemeral: true });
 
     try {
+      const itemPreview = await itemService.getItem(interaction.guildId, itemKey);
+      if (itemPreview.category === 'role' && quantity !== 1) {
+        await interaction.editReply({ embeds: [errorEmbed('Роль можно купить только в одном экземпляре.')] });
+        return;
+      }
+    } catch {
+      // Провалимся дальше в общий catch ниже с тем же ItemNotFoundError — не дублируем обработку.
+    }
+
+    try {
       const idempotencyKey = `buy:${interaction.id}`;
       const { wallet, item, totalPrice } = await itemService.buyItem({
         guildId: interaction.guildId,
@@ -49,6 +61,28 @@ module.exports = {
           `Баланс: **${wallet[item.currency].toLocaleString('ru-RU')}** ${icon(item.currency)}`,
         color: config.colors.success,
       });
+
+      // Роль из магазина ролей — выдаём реальную Discord-роль после успешной оплаты.
+      if (item.category === 'role') {
+        try {
+          const role = await roleAutomationService.ensureRole({
+            guild: interaction.guild,
+            roleId: item.roleId,
+            name: item.discordRoleName || item.name,
+            color: item.discordRoleColor,
+          });
+          if (!item.roleId || item.roleId !== role.id) {
+            await Item.updateOne({ guildId: interaction.guildId, key: itemKey }, { $set: { roleId: role.id } });
+          }
+          await interaction.member.roles.add(role);
+          embed.data.description += `\n\n✅ Роль ${role} выдана.`;
+        } catch (roleErr) {
+          interaction.client.logger?.error?.('[/buy role grant]', roleErr);
+          embed.data.description += `\n\n⚠️ Монеты списаны, но роль выдать не удалось (не хватает прав у бота или роль выше в иерархии). Обратитесь к администратору сервера.`;
+          embed.setColor(config.colors.warning);
+        }
+      }
+
       await interaction.editReply({ embeds: [embed] });
     } catch (err) {
       if (err instanceof ItemNotFoundError) {

@@ -88,7 +88,9 @@ module.exports = {
       }
 
       // Гифка соответствует тому, что реально выпало (result), а не тому, что выбрал игрок.
-      const resultGifUrl = result === 'heads' ? config.assets.coinflipHeadsGifUrl : config.assets.coinflipTailsGifUrl;
+      const resultGifUrl = config.assets.pickRandomGif(
+        result === 'heads' ? config.assets.coinflipHeadsGifUrls : config.assets.coinflipTailsGifUrls
+      );
 
       const resultEmbed = baseEmbed({
         title: won ? 'Вы выиграли' : 'Вы проиграли',

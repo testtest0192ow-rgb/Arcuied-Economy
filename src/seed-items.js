@@ -9,6 +9,17 @@ const SAMPLE_ITEMS = [
   { key: 'title_veteran', name: 'Титул: Ветеран', description: 'Косметический титул для профиля.', price: 500, category: 'title', stackable: false, usable: true },
   { key: 'coin_booster_1h', name: 'Бустер монет (1ч)', description: 'Удваивает монеты с /timely на 1 час.', price: 300, category: 'booster', usable: true },
   { key: 'case_common', name: 'Обычный кейс', description: 'Содержит случайные предметы и монеты.', price: 200, category: 'case' },
+  {
+    key: 'role_test',
+    name: 'Тестовая роль',
+    description: 'Пример из магазина ролей — бот создаст роль автоматически при первой покупке.',
+    price: 400,
+    category: 'role',
+    stackable: false,
+    sellable: false,
+    discordRoleName: 'ARCUEID | Тест',
+    discordRoleColor: '#ff4d6d',
+  },
 ];
 
 const guildId = process.argv[2] || process.env.TEST_GUILD_ID;

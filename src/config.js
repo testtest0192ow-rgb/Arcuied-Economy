@@ -8,6 +8,20 @@ function requireEnv(name) {
   return value;
 }
 
+// Парсит "url1,url2,url3" в массив, отбрасывая пустые элементы. Пусто/не задано -> [].
+function parseGifList(name) {
+  const raw = process.env[name] || '';
+  return raw
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
+}
+
+function pickRandom(list) {
+  if (!list || list.length === 0) return null;
+  return list[Math.floor(Math.random() * list.length)];
+}
+
 const config = {
   discordToken: requireEnv('DISCORD_TOKEN'),
   clientId: requireEnv('DISCORD_CLIENT_ID'),
@@ -17,20 +31,22 @@ const config = {
   maxGuilds: Number(process.env.MAX_GUILDS || 10),
   botOwnerId: process.env.BOT_OWNER_ID || null,
   timelyCooldownHours: Number(process.env.TIMELY_COOLDOWN_HOURS || 12),
-  // Канал, куда падают уведомления о новых /report — если не задан, отчёт создаётся
-  // в БД, но никто не получит уведомление, пока не настроишь.
-  reportChannelId: process.env.REPORT_CHANNEL_ID || null,
+  // Комиссия на /give в процентах — списывается сверх суммы перевода и просто
+  // уходит из экономики (не начисляется никому), как у конкурентов.
+  giveFeePercent: Number(process.env.GIVE_FEE_PERCENT || 2),
   assets: {
     // Гифки результата /coinflip — показываются в зависимости от того, что реально
-    // выпало (не от того, что выбрал игрок).
-    coinflipHeadsGifUrl: process.env.COINFLIP_HEADS_GIF_URL || null,
-    coinflipTailsGifUrl: process.env.COINFLIP_TAILS_GIF_URL || null,
+    // выпало (не от того, что выбрал игрок). Можно указать несколько через запятую
+    // в .env — тогда каждый раз выбирается случайная из списка.
+    coinflipHeadsGifUrls: parseGifList('COINFLIP_HEADS_GIF_URL'),
+    coinflipTailsGifUrls: parseGifList('COINFLIP_TAILS_GIF_URL'),
     // GIF для стадии "Дуэль началась". Слева всегда challenger (тот, кто вызвал),
     // справа всегда opponent (кого вызвали) — так и в embed, и в самой гифке.
-    duelGifUrl: process.env.DUEL_GIF_URL || null,
-    // GIF для результата /dice — можно сделать 6 разных (по выпавшей грани) через
-    // diceGifUrls[1..6], или одну общую через diceGifUrl.
-    diceGifUrl: process.env.DICE_GIF_URL || null,
+    // Можно указать несколько через запятую — выбирается случайная.
+    duelGifUrls: parseGifList('DUEL_GIF_URL'),
+    // Гифки результата /dice — можно указать несколько через запятую, выбирается случайная.
+    diceGifUrls: parseGifList('DICE_GIF_URL'),
+    pickRandomGif: pickRandom,
   },
   // Белые кастомные иконки для select-меню (сортировка в /shop и т.п.). По умолчанию
   // используются обычные текстовые символы (★ ↓ ↑ ▦), которые Discord рендерит

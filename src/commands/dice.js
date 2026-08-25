@@ -1,6 +1,7 @@
-const { SlashCommandBuilder } = require('discord.js');
+const { SlashCommandBuilder, AttachmentBuilder } = require('discord.js');
 const { transactionService, InsufficientFundsError, DuplicateActionError } = require('../services/TransactionService');
 const { gameFairnessService } = require('../services/GameFairnessService');
+const { generateDiceGif } = require('../services/AnimatedGifService');
 const { baseEmbed, errorEmbed, DIVIDER, COIN_ICON } = require('../utils/embeds');
 const config = require('../config');
 
@@ -70,11 +71,18 @@ module.exports = {
           `-# proof: ${proofHash.slice(0, 16)}...`,
         color: won ? config.colors.success : config.colors.danger,
       });
-      if (config.assets.diceGifUrl) {
-        resultEmbed.setImage(config.assets.diceGifUrl);
+      const customDiceGifUrl = config.assets.pickRandomGif(config.assets.diceGifUrls);
+      let files = [];
+      if (customDiceGifUrl) {
+        resultEmbed.setImage(customDiceGifUrl);
+      } else {
+        const gifBuffer = generateDiceGif();
+        const attachment = new AttachmentBuilder(gifBuffer, { name: 'dice.gif' });
+        resultEmbed.setImage('attachment://dice.gif');
+        files = [attachment];
       }
 
-      await interaction.editReply({ embeds: [resultEmbed] });
+      await interaction.editReply({ embeds: [resultEmbed], files });
     } catch (err) {
       if (err instanceof InsufficientFundsError) {
         await interaction.editReply({ embeds: [errorEmbed('Недостаточно средств на момент броска.')] });

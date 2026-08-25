@@ -16,6 +16,12 @@ const itemSchema = new Schema(
     sellRatio: { type: Number, default: 0.5 }, // fraction of price returned on /sell
     active: { type: Boolean, default: true },
     timesPurchased: { type: Number, default: 0 }, // used for "Сначала популярные" sort in /shop
+    // Только для category === 'role': ID реальной Discord-роли, которую бот выдаёт при покупке.
+    // Роль либо уже существует на сервере (создаётся вручную через Dashboard/будущую команду),
+    // либо помечена discordRoleColor/discordRoleName для авто-создания при первой покупке.
+    roleId: { type: String, default: null },
+    discordRoleName: { type: String, default: null },
+    discordRoleColor: { type: String, default: null }, // hex, напр. "#ff4d6d"
   },
   { timestamps: true }
 );
