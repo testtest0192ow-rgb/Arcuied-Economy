@@ -8,12 +8,6 @@ const walletSchema = new Schema(
     donateCoins: { type: Number, required: true, default: 0, min: 0 },
     lastTimelyAt: { type: Date, default: null },
     timelyStreak: { type: Number, default: 0 },
-    duelWins: { type: Number, default: 0 },
-    duelLosses: { type: Number, default: 0 },
-    mogWins: { type: Number, default: 0 },
-    mogLosses: { type: Number, default: 0 },
-    reputation: { type: Number, default: 0 },
-    lastRepGivenAt: { type: Date, default: null }, // cooldown lives on the GIVER's wallet
   },
   { timestamps: true }
 );

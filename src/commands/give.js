@@ -41,14 +41,9 @@ module.exports = {
       return;
     }
 
-    const fee = Math.floor((amount * config.giveFeePercent) / 100);
-    const willArrive = amount - fee;
     const confirmEmbed = baseEmbed({
       title: 'Подтвердите передачу',
-      description:
-        `${DIVIDER}\n` +
-        `Отправить **${amount.toLocaleString('ru-RU')}** ${COIN_ICON} пользователю ${targetUser}?\n` +
-        `-# Комиссия ${config.giveFeePercent}%: **${fee.toLocaleString('ru-RU')}** ${COIN_ICON} · получит **${willArrive.toLocaleString('ru-RU')}** ${COIN_ICON}`,
+      description: `${DIVIDER}\nОтправить **${amount.toLocaleString('ru-RU')}** ${COIN_ICON} пользователю ${targetUser}?`,
     });
 
     const row = new ActionRowBuilder().addComponents(
@@ -80,7 +75,7 @@ module.exports = {
 
     try {
       const idempotencyKey = `give:${interaction.id}`;
-      const { from, fee: appliedFee, amountAfterFee } = await transactionService.transferCoins({
+      const { from } = await transactionService.transferCoins({
         guildId: interaction.guildId,
         fromUserId: interaction.user.id,
         toUserId: targetUser.id,
@@ -93,8 +88,7 @@ module.exports = {
         description:
           `${DIVIDER}\n` +
           `Получатель: ${targetUser}\n` +
-          `Сумма: **${amount.toLocaleString('ru-RU')}** ${COIN_ICON}\n` +
-          `Комиссия: **${appliedFee.toLocaleString('ru-RU')}** ${COIN_ICON} · получено: **${amountAfterFee.toLocaleString('ru-RU')}** ${COIN_ICON}\n\n` +
+          `Сумма: **${amount.toLocaleString('ru-RU')}** ${COIN_ICON}\n\n` +
           `Ваш баланс: **${from.coins.toLocaleString('ru-RU')}** ${COIN_ICON}`,
         color: config.colors.success,
       });
@@ -105,7 +99,7 @@ module.exports = {
           embeds: [
             baseEmbed({
               title: 'Вам передали монеты',
-              description: `${DIVIDER}\nОт: ${interaction.user}\nСумма: **${amountAfterFee.toLocaleString('ru-RU')}** ${COIN_ICON} (после комиссии ${config.giveFeePercent}%)`,
+              description: `${DIVIDER}\nОт: ${interaction.user}\nСумма: **${amount.toLocaleString('ru-RU')}** ${COIN_ICON}`,
               color: config.colors.success,
             }),
           ],

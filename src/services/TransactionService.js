@@ -1,7 +1,6 @@
 const mongoose = require('mongoose');
 const Wallet = require('../models/Wallet');
 const Transaction = require('../models/Transaction');
-const config = require('../config');
 
 class InsufficientFundsError extends Error {
   constructor() {
@@ -99,9 +98,6 @@ class TransactionService {
 
   /**
    * Atomically moves `amount` coins from one user's wallet to another's, or throws.
-   * A percentage fee (config.giveFeePercent) is deducted from the transfer and simply
-   * removed from the economy (not credited anywhere) — same behavior shown by XIVIVIDE's
-   * /give. Sender pays the full `amount`; receiver gets `amount - fee`.
    * Uses a Mongo session transaction so it's all-or-nothing across both documents.
    */
   async transferCoins({ guildId, fromUserId, toUserId, amount, idempotencyKey, meta = {} }) {
@@ -111,9 +107,6 @@ class TransactionService {
     if (fromUserId === toUserId) {
       throw new Error('Нельзя перевести монеты самому себе');
     }
-
-    const fee = Math.floor((amount * config.giveFeePercent) / 100);
-    const amountAfterFee = amount - fee;
 
     await this.getOrCreateWallet(guildId, fromUserId);
     await this.getOrCreateWallet(guildId, toUserId);
@@ -135,7 +128,7 @@ class TransactionService {
 
         resultTo = await Wallet.findOneAndUpdate(
           { guildId, userId: toUserId },
-          { $inc: { coins: amountAfterFee } },
+          { $inc: { coins: amount } },
           { new: true, session }
         );
 
@@ -151,18 +144,18 @@ class TransactionService {
                 balanceAfter: resultFrom.coins,
                 relatedUserId: toUserId,
                 idempotencyKey: `${idempotencyKey}:sent`,
-                meta: { ...meta, fee },
+                meta,
               },
               {
                 guildId,
                 userId: toUserId,
                 type: 'give_received',
                 currency: 'coins',
-                amount: amountAfterFee,
+                amount,
                 balanceAfter: resultTo.coins,
                 relatedUserId: fromUserId,
                 idempotencyKey: `${idempotencyKey}:received`,
-                meta: { ...meta, fee },
+                meta,
               },
             ],
             { session, ordered: true }
@@ -175,7 +168,7 @@ class TransactionService {
         }
       });
 
-      return { from: resultFrom, to: resultTo, fee, amountAfterFee };
+      return { from: resultFrom, to: resultTo };
     } finally {
       await session.endSession();
     }

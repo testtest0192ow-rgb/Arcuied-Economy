@@ -1,13 +1,11 @@
 const { EmbedBuilder } = require('discord.js');
 const config = require('../config');
 
-// "-# " — синтаксис Discord для мелкого приглушённого подтекста (subtext). Без него
-// разделитель рисуется обычным текстом в полный размер — толсто и грубо, не как у
-// референсов. Один раз меняем константу — чинит линию сразу во всех командах бота.
-const DIVIDER = '-# ' + '─'.repeat(24);
-// Кастомные эмодзи ARCUEID — заменить ID, если пересоздашь эмодзи на своём сервере разработки.
-const COIN_ICON = '<:coin:1539520610261012572>';
-const DONATE_ICON = '<:donatecoin:1539527983797243915>';
+const DIVIDER = '─'.repeat(24);
+// Заменить на кастомные эмодзи ARCUEID, когда ассеты будут загружены на сервер разработки:
+// <:coin:ID> и <:donatecoin:ID>
+const COIN_ICON = '🔸';
+const DONATE_ICON = '💠';
 
 function baseEmbed({ title, description, color = config.colors.primary }) {
   return new EmbedBuilder().setTitle(title).setDescription(description).setColor(color);
