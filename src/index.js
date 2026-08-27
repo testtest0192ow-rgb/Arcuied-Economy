@@ -30,10 +30,12 @@ for (const file of fs.readdirSync(eventsPath).filter((f) => f.endsWith('.js'))) 
   }
 }
 
-// Refuse to operate on servers outside the allowed list — this bot is scoped to ~10 guilds.
+// Мягкий лимит по количеству серверов, а не по конкретным ID — можно добавлять
+// бота куда угодно, лишь бы одновременно их было не больше config.maxGuilds.
+// Если уже на лимите и добавляют на ещё один сервер — бот сам с него выходит.
 client.on('guildCreate', async (guild) => {
-  if (config.allowedGuildIds.length > 0 && !config.allowedGuildIds.includes(guild.id)) {
-    logger.warn(`[guard] Сервер ${guild.id} не в списке разрешённых — покидаю.`);
+  if (client.guilds.cache.size > config.maxGuilds) {
+    logger.warn(`[guard] Превышен лимит серверов (${config.maxGuilds}) — покидаю "${guild.name}" (${guild.id}).`);
     await guild.leave().catch(() => {});
   }
 });
