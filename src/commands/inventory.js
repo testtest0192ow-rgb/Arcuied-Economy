@@ -17,7 +17,7 @@ module.exports = {
       const entries = await itemService.getInventory(interaction.guildId, targetUser.id);
       if (entries.length === 0) {
         await interaction.editReply({
-          embeds: [baseEmbed({ title: `Инвентарь — ${targetUser.username}`, description: `${DIVIDER}\nПусто.` })],
+          embeds: [baseEmbed({ title: `Инвентарь — ${targetUser.username}`, description: `Пусто.` })],
         });
         return;
       }
@@ -37,7 +37,7 @@ module.exports = {
       }
 
       const description =
-        `${DIVIDER}\n` +
+        `` +
         Object.entries(byCategory)
           .map(([category, lines]) => `__${category}__\n${lines.join('\n')}`)
           .join('\n\n');

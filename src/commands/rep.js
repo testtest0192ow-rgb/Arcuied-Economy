@@ -55,7 +55,7 @@ module.exports = {
       embeds: [
         baseEmbed({
           title: 'Репутация выдана',
-          description: `${DIVIDER}\n${targetUser} теперь имеет **${targetWallet.reputation}** репутации.`,
+          description: `${targetUser} теперь имеет **${targetWallet.reputation}** репутации.`,
           color: config.colors.success,
         }),
       ],

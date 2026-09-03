@@ -55,7 +55,7 @@ module.exports = {
       const embed = baseEmbed({
         title: 'Покупка совершена',
         description:
-          `${DIVIDER}\n` +
+          `` +
           `**${item.name}** × ${quantity}\n` +
           `Списано: **${totalPrice.toLocaleString('ru-RU')}** ${icon(item.currency)}\n\n` +
           `Баланс: **${wallet[item.currency].toLocaleString('ru-RU')}** ${icon(item.currency)}`,

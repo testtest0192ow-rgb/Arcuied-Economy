@@ -1,6 +1,6 @@
 const { SlashCommandBuilder } = require('discord.js');
 const { transactionService, TimelyOnCooldownError } = require('../services/TransactionService');
-const { baseEmbed, errorEmbed, DIVIDER, COIN_ICON } = require('../utils/embeds');
+const { baseEmbed, errorEmbed, COIN_ICON, attachDivider } = require('../utils/embeds');
 const config = require('../config');
 
 function formatTimeLeft(ms) {
@@ -28,24 +28,25 @@ module.exports = {
       const embed = baseEmbed({
         title: 'Награда получена',
         description:
-          `${DIVIDER}\n` +
           `Вы получили **${reward}** ${COIN_ICON}\n` +
           `Серия: **${streak}** ${streak === 1 ? 'день' : 'дней'} подряд\n\n` +
           `Текущий баланс: **${wallet.coins.toLocaleString('ru-RU')}** ${COIN_ICON}\n` +
           `-# Возвращайтесь через ${config.timelyCooldownHours} ч, чтобы не потерять серию.`,
         color: config.colors.success,
       });
+      const divider = attachDivider(embed);
 
-      await interaction.editReply({ embeds: [embed] });
+      await interaction.editReply({ embeds: [embed], files: [divider] });
     } catch (err) {
       if (err instanceof TimelyOnCooldownError) {
         const msLeft = err.nextAvailableAt.getTime() - Date.now();
         const embed = baseEmbed({
           title: 'Награда ещё не готова',
-          description: `${DIVIDER}\nВозвращайтесь через **${formatTimeLeft(msLeft)}**.`,
+          description: `Возвращайтесь через **${formatTimeLeft(msLeft)}**.`,
           color: config.colors.warning,
         });
-        await interaction.editReply({ embeds: [embed] });
+        const divider = attachDivider(embed);
+        await interaction.editReply({ embeds: [embed], files: [divider] });
         return;
       }
       interaction.client.logger?.error?.('[/timely]', err);

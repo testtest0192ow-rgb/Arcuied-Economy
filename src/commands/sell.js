@@ -53,7 +53,7 @@ module.exports = {
     const refund = Math.floor(item.price * item.sellRatio * quantity);
     const confirmEmbed = baseEmbed({
       title: 'Продажа',
-      description: `${DIVIDER}\n**${item.name}** × ${quantity}\nВы получите: **${refund.toLocaleString('ru-RU')}** ${icon(item.currency)}`,
+      description: `**${item.name}** × ${quantity}\nВы получите: **${refund.toLocaleString('ru-RU')}** ${icon(item.currency)}`,
     });
     const row = new ActionRowBuilder().addComponents(
       new ButtonBuilder().setCustomId('sell:confirm').setLabel('Продать').setStyle(ButtonStyle.Success),
@@ -74,7 +74,7 @@ module.exports = {
     }
 
     if (choice.customId === 'sell:cancel') {
-      await choice.update({ embeds: [baseEmbed({ title: 'Отменено', description: `${DIVIDER}\nПродажа не выполнена.` })], components: [] });
+      await choice.update({ embeds: [baseEmbed({ title: 'Отменено', description: `Продажа не выполнена.` })], components: [] });
       return;
     }
 
@@ -93,7 +93,7 @@ module.exports = {
       const embed = baseEmbed({
         title: 'Продано',
         description:
-          `${DIVIDER}\n**${item.name}** × ${quantity}\nПолучено: **${refund.toLocaleString('ru-RU')}** ${icon(item.currency)}\n\n` +
+          `**${item.name}** × ${quantity}\nПолучено: **${refund.toLocaleString('ru-RU')}** ${icon(item.currency)}\n\n` +
           `Баланс: **${wallet[item.currency].toLocaleString('ru-RU')}** ${icon(item.currency)}`,
         color: config.colors.success,
       });

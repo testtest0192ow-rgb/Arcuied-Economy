@@ -1,6 +1,6 @@
 const { SlashCommandBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 const { transactionService } = require('../services/TransactionService');
-const { balanceEmbed, errorEmbed } = require('../utils/embeds');
+const { balanceEmbed, errorEmbed, attachDivider } = require('../utils/embeds');
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -16,6 +16,7 @@ module.exports = {
     try {
       const wallet = await transactionService.getOrCreateWallet(interaction.guildId, targetUser.id);
       const embed = balanceEmbed(targetUser, wallet);
+      const divider = attachDivider(embed);
 
       const row = new ActionRowBuilder().addComponents(
         new ButtonBuilder()
@@ -24,14 +25,13 @@ module.exports = {
           .setStyle(ButtonStyle.Secondary)
       );
 
-      await interaction.editReply({ embeds: [embed], components: [row] });
+      await interaction.editReply({ embeds: [embed], components: [row], files: [divider] });
     } catch (err) {
       interaction.client.logger?.error?.('[/balance]', err);
       await interaction.editReply({ embeds: [errorEmbed()], components: [] });
     }
   },
 
-  // Handles the "Показать всем" button click.
   async handleButton(interaction) {
     const targetUserId = interaction.customId.split(':')[2];
 
@@ -39,8 +39,9 @@ module.exports = {
       const targetUser = await interaction.client.users.fetch(targetUserId);
       const wallet = await transactionService.getOrCreateWallet(interaction.guildId, targetUserId);
       const embed = balanceEmbed(targetUser, wallet);
+      const divider = attachDivider(embed);
 
-      await interaction.channel.send({ embeds: [embed] });
+      await interaction.channel.send({ embeds: [embed], files: [divider] });
       await interaction.reply({ content: 'Готово, показал всем в чате.', ephemeral: true });
     } catch (err) {
       interaction.client.logger?.error?.('[/balance button]', err);

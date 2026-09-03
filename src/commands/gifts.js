@@ -35,14 +35,14 @@ async function handleSend(interaction) {
       embeds: [
         baseEmbed({
           title: 'Подарок отправлен',
-          description: `${DIVIDER}\n${targetUser} получит **${amount.toLocaleString('ru-RU')}** ${COIN_ICON} после того, как откроет подарок (\`/gifts list\`).`,
+          description: `${targetUser} получит **${amount.toLocaleString('ru-RU')}** ${COIN_ICON} после того, как откроет подарок (\`/gifts list\`).`,
           color: config.colors.success,
         }),
       ],
     });
 
     targetUser
-      .send({ embeds: [baseEmbed({ title: 'Вам подарок', description: `${DIVIDER}\nОт: ${interaction.user}\nОткройте его командой \`/gifts list\`.` })] })
+      .send({ embeds: [baseEmbed({ title: 'Вам подарок', description: `От: ${interaction.user}\nОткройте его командой \`/gifts list\`.` })] })
       .catch(() => {});
   } catch (err) {
     if (err instanceof InsufficientFundsError) {
@@ -62,7 +62,7 @@ async function handleList(interaction) {
   try {
     const pending = await giftService.listPending(interaction.guildId, interaction.user.id);
     if (pending.length === 0) {
-      await interaction.editReply({ embeds: [baseEmbed({ title: 'Подарки', description: `${DIVIDER}\nНепринятых подарков нет.` })] });
+      await interaction.editReply({ embeds: [baseEmbed({ title: 'Подарки', description: `Непринятых подарков нет.` })] });
       return;
     }
 
@@ -80,7 +80,7 @@ async function handleList(interaction) {
       );
 
     await interaction.editReply({
-      embeds: [baseEmbed({ title: 'Непринятые подарки', description: `${DIVIDER}\n${lines.join('\n')}` })],
+      embeds: [baseEmbed({ title: 'Непринятые подарки', description: `${lines.join('\n')}` })],
       components: rows,
     });
   } catch (err) {
@@ -92,7 +92,7 @@ async function handleList(interaction) {
 function guessGiftRoundEmbed(hiderUser, amount, statusText) {
   return baseEmbed({
     title: 'Угадай подарок',
-    description: `${DIVIDER}\n${hiderUser} спрятал **${amount.toLocaleString('ru-RU')}** ${COIN_ICON} в одном из подарков!\n\n${statusText}`,
+    description: `${hiderUser} спрятал **${amount.toLocaleString('ru-RU')}** ${COIN_ICON} в одном из подарков!\n\n${statusText}`,
   });
 }
 
@@ -115,7 +115,7 @@ async function handleHide(interaction) {
     const round = await guessGiftService.hide({ guildId: interaction.guildId, hiderId: interaction.user.id, amount });
 
     await interaction.editReply({
-      embeds: [baseEmbed({ title: 'Спрятано', description: `${DIVIDER}\nВы спрятали **${amount.toLocaleString('ru-RU')}** ${COIN_ICON} в одном из 3 подарков. Публикую в чат — первый, кто угадает, заберёт их.`, color: config.colors.success })],
+      embeds: [baseEmbed({ title: 'Спрятано', description: `Вы спрятали **${amount.toLocaleString('ru-RU')}** ${COIN_ICON} в одном из 3 подарков. Публикую в чат — первый, кто угадает, заберёт их.`, color: config.colors.success })],
     });
 
     const publicMessage = await interaction.channel.send({
@@ -233,7 +233,7 @@ module.exports = {
           : `Вы получили **${gift.itemKey}** × ${gift.quantity}.`;
 
       await interaction.followUp({
-        embeds: [baseEmbed({ title: 'Подарок открыт', description: `${DIVIDER}\n${description}`, color: config.colors.success })],
+        embeds: [baseEmbed({ title: 'Подарок открыт', description: `${description}`, color: config.colors.success })],
         ephemeral: true,
       });
     } catch (err) {

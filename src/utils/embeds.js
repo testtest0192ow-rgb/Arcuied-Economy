@@ -1,11 +1,10 @@
 const { EmbedBuilder } = require('discord.js');
 const config = require('../config');
+const { attachDivider } = require('../services/DividerImageService');
 
-// "-# " — синтаксис Discord для мелкого приглушённого подтекста (subtext). Без него
-// разделитель рисуется обычным текстом в полный размер — толсто и грубо, не как у
-// референсов. Один раз меняем константу — чинит линию сразу во всех командах бота.
+// "-# " — синтаксис Discord для мелкого приглушённого подтекста (subtext).
+// Используется в errorEmbed() и разовых сносках — НЕ трогать, это не разделитель.
 const DIVIDER = '-# ' + '─'.repeat(24);
-// Кастомные эмодзи ARCUEID — заменить ID, если пересоздашь эмодзи на своём сервере разработки.
 const COIN_ICON = '<:coin:1539520610261012572>';
 const DONATE_ICON = '<:donatecoin:1539527983797243915>';
 
@@ -21,14 +20,15 @@ function errorEmbed(message = 'Произошла временная ошибк�
   });
 }
 
+// Теперь без текстового DIVIDER — линия рисуется картинкой через attachDivider(embed)
+// в самой команде (нужно и embed, и attachment вместе, поэтому решение не здесь).
 function balanceEmbed(targetUser, wallet) {
   return baseEmbed({
     title: `Текущий баланс — ${targetUser.username}`,
     description:
-      `${DIVIDER}\n` +
       `${COIN_ICON} **Монеты**\n**${wallet.coins.toLocaleString('ru-RU')}**\n\n` +
       `${DONATE_ICON} **Донат-монеты**\n**${wallet.donateCoins.toLocaleString('ru-RU')}**`,
   });
 }
 
-module.exports = { baseEmbed, errorEmbed, balanceEmbed, DIVIDER, COIN_ICON, DONATE_ICON };
+module.exports = { baseEmbed, errorEmbed, balanceEmbed, attachDivider, DIVIDER, COIN_ICON, DONATE_ICON };

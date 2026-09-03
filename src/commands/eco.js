@@ -66,7 +66,7 @@ module.exports = {
         embeds: [
           baseEmbed({
             title: `Баланс — ${targetUser.username} (админ-просмотр)`,
-            description: `${DIVIDER}\n${COIN_ICON} Монеты: **${wallet.coins.toLocaleString('ru-RU')}**\n${DONATE_ICON} Донат-монеты: **${wallet.donateCoins.toLocaleString('ru-RU')}**`,
+            description: `${COIN_ICON} Монеты: **${wallet.coins.toLocaleString('ru-RU')}**\n${DONATE_ICON} Донат-монеты: **${wallet.donateCoins.toLocaleString('ru-RU')}**`,
           }),
         ],
       });
@@ -77,7 +77,7 @@ module.exports = {
 
     const confirmEmbed = baseEmbed({
       title: 'Подтвердите действие',
-      description: `${DIVIDER}\n${describeAction(sub, targetUser, amount, currency)}`,
+      description: `${describeAction(sub, targetUser, amount, currency)}`,
       color: config.colors.warning,
     });
     const row = new ActionRowBuilder().addComponents(
@@ -100,7 +100,7 @@ module.exports = {
     }
 
     if (choice.customId === 'eco:cancel') {
-      await choice.update({ embeds: [baseEmbed({ title: 'Отменено', description: `${DIVIDER}\nДействие не выполнено.` })], components: [] });
+      await choice.update({ embeds: [baseEmbed({ title: 'Отменено', description: `Действие не выполнено.` })], components: [] });
       return;
     }
     await choice.update({ components: [] });
@@ -145,7 +145,7 @@ module.exports = {
       const resultCurrency = sub === 'reset' ? 'coins' : currency;
       const successEmbed = baseEmbed({
         title: 'Выполнено',
-        description: `${DIVIDER}\n${describeAction(sub, targetUser, amount, currency)}\n\nНовый баланс: **${wallet[resultCurrency].toLocaleString('ru-RU')}** ${icon(resultCurrency)}`,
+        description: `${describeAction(sub, targetUser, amount, currency)}\n\nНовый баланс: **${wallet[resultCurrency].toLocaleString('ru-RU')}** ${icon(resultCurrency)}`,
         color: config.colors.success,
       });
       await interaction.editReply({ embeds: [successEmbed], components: [] });

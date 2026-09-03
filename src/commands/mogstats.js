@@ -21,7 +21,7 @@ module.exports = {
         embeds: [
           baseEmbed({
             title: `Mog Battle — ${targetUser.username}`,
-            description: `${DIVIDER}\nПобед: **${wins}**\nПоражений: **${losses}**\nВинрейт: **${winrate}%**`,
+            description: `Побед: **${wins}**\nПоражений: **${losses}**\nВинрейт: **${winrate}%**`,
           }),
         ],
       });

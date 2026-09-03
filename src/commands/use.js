@@ -29,7 +29,7 @@ module.exports = {
 
       const embed = baseEmbed({
         title: 'Предмет использован',
-        description: `${DIVIDER}\n**${item.name}** применён.`,
+        description: `**${item.name}** применён.`,
         color: config.colors.success,
       });
       await interaction.editReply({ embeds: [embed] });

@@ -40,7 +40,7 @@ function renderCategory(items, category, sort) {
   if (items.length === 0) {
     return baseEmbed({
       title: CATEGORY_LABELS[category] || category,
-      description: `${DIVIDER}\nВ этой категории пока пусто.`,
+      description: `В этой категории пока пусто.`,
     });
   }
   const lines = sortItems(items, sort).map(
@@ -48,7 +48,7 @@ function renderCategory(items, category, sort) {
   );
   return baseEmbed({
     title: CATEGORY_LABELS[category] || category,
-    description: `${DIVIDER}\n${lines.join('\n\n')}\n\n-# ${sortLabel}`,
+    description: `${lines.join('\n\n')}\n\n-# ${sortLabel}`,
   });
 }
 
@@ -61,7 +61,7 @@ module.exports = {
     try {
       const allItems = await itemService.listShop(interaction.guildId);
       if (allItems.length === 0) {
-        await interaction.editReply({ embeds: [baseEmbed({ title: 'Магазин', description: `${DIVIDER}\nМагазин пока пуст.` })] });
+        await interaction.editReply({ embeds: [baseEmbed({ title: 'Магазин', description: `Магазин пока пуст.` })] });
         return;
       }
 

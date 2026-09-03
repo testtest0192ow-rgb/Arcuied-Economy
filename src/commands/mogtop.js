@@ -13,7 +13,7 @@ module.exports = {
     try {
       const top = await mogBattleService.getTop(interaction.guildId, 10);
       if (top.length === 0) {
-        await interaction.editReply({ embeds: [baseEmbed({ title: 'Топ Mog Battle', description: `${DIVIDER}\nПока никто не побеждал.` })] });
+        await interaction.editReply({ embeds: [baseEmbed({ title: 'Топ Mog Battle', description: `Пока никто не побеждал.` })] });
         return;
       }
 
@@ -25,7 +25,7 @@ module.exports = {
         })
       );
 
-      await interaction.editReply({ embeds: [baseEmbed({ title: 'Топ Mog Battle', description: `${DIVIDER}\n${lines.join('\n')}` })] });
+      await interaction.editReply({ embeds: [baseEmbed({ title: 'Топ Mog Battle', description: `${lines.join('\n')}` })] });
     } catch (err) {
       interaction.client.logger?.error?.('[/mogtop]', err);
       await interaction.editReply({ embeds: [errorEmbed()] });

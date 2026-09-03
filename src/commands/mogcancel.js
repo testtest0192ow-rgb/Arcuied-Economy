@@ -10,7 +10,7 @@ module.exports = {
 
     try {
       await mogBattleService.cancelOwnPending({ guildId: interaction.guildId, challengerId: interaction.user.id });
-      await interaction.editReply({ embeds: [baseEmbed({ title: 'Вызов отменён', description: `${DIVIDER}\nВаш ожидающий вызов на Mog Battle отменён.` })] });
+      await interaction.editReply({ embeds: [baseEmbed({ title: 'Вызов отменён', description: `Ваш ожидающий вызов на Mog Battle отменён.` })] });
     } catch (err) {
       if (err instanceof NoPendingBattleError) {
         await interaction.editReply({ embeds: [errorEmbed('У вас нет ожидающих вызовов на Mog Battle.')] });

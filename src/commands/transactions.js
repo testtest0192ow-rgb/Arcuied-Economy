@@ -31,7 +31,7 @@ module.exports = {
     try {
       const history = await transactionService.getTransactionHistory(interaction.guildId, interaction.user.id, 10);
       if (history.length === 0) {
-        await interaction.editReply({ embeds: [baseEmbed({ title: 'История операций', description: `${DIVIDER}\nПока пусто.` })] });
+        await interaction.editReply({ embeds: [baseEmbed({ title: 'История операций', description: `Пока пусто.` })] });
         return;
       }
 
@@ -43,7 +43,7 @@ module.exports = {
       });
 
       await interaction.editReply({
-        embeds: [baseEmbed({ title: 'История операций', description: `${DIVIDER}\n${lines.join('\n')}\n\n-# Последние 10 операций` })],
+        embeds: [baseEmbed({ title: 'История операций', description: `${lines.join('\n')}\n\n-# Последние 10 операций` })],
       });
     } catch (err) {
       interaction.client.logger?.error?.('[/transactions]', err);

@@ -7,7 +7,7 @@ const MEDALS = ['🥇', '🥈', '🥉'];
 async function renderCoinsLeaderboard(guildId, client) {
   const top = await Wallet.find({ guildId }).sort({ coins: -1 }).limit(10).lean();
   if (top.length === 0) {
-    return baseEmbed({ title: 'Рейтинг — Монеты', description: `${DIVIDER}\nПока никто не заработал монет.` });
+    return baseEmbed({ title: 'Рейтинг — Монеты', description: `Пока никто не заработал монет.` });
   }
   const lines = await Promise.all(
     top.map(async (w, index) => {
@@ -16,7 +16,7 @@ async function renderCoinsLeaderboard(guildId, client) {
       return `${place} ${user ? user.username : w.userId} — **${w.coins.toLocaleString('ru-RU')}** ${COIN_ICON}`;
     })
   );
-  return baseEmbed({ title: 'Рейтинг — Монеты', description: `${DIVIDER}\n${lines.join('\n')}` });
+  return baseEmbed({ title: 'Рейтинг — Монеты', description: `${lines.join('\n')}` });
 }
 
 // Уровень, репутация, кланы, победы, игры — подключаются по мере готовности соответствующих ботов/моделей.
