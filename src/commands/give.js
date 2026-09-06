@@ -31,7 +31,7 @@ module.exports = {
       return;
     }
 
-    await interaction.deferReply({ ephemeral: true });
+    await interaction.deferReply();
 
     const senderWallet = await transactionService.getOrCreateWallet(interaction.guildId, interaction.user.id);
     if (senderWallet.coins < amount) {

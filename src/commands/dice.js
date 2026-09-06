@@ -1,99 +1,112 @@
-const { SlashCommandBuilder, AttachmentBuilder } = require('discord.js');
-const { transactionService, InsufficientFundsError, DuplicateActionError } = require('../services/TransactionService');
-const { gameFairnessService } = require('../services/GameFairnessService');
-const { generateDiceGif } = require('../services/AnimatedGifService');
+const { SlashCommandBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType } = require('discord.js');
+const { duelService, DuelNotPendingError, DuelAlreadyTakenError } = require('../services/DuelService');
+const { transactionService, InsufficientFundsError } = require('../services/TransactionService');
 const { baseEmbed, errorEmbed, DIVIDER, COIN_ICON } = require('../utils/embeds');
 const config = require('../config');
 
-const PAYOUT_MULTIPLIER = 5; // угадать грань 1/6 — честная выплата была бы x6, x5 задаёт небольшой запас казино
+const DICE_FACES = { 1: '⚀', 2: '⚁', 3: '⚂', 4: '⚃', 5: '⚄', 6: '⚅' };
+const formatRoll = (values) => values.map((v) => DICE_FACES[v] || v).join(' ');
 
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('dice')
-    .setDescription('Угадать грань кубика на ставку')
-    .addIntegerOption((opt) => opt.setName('bet').setDescription('Размер ставки').setRequired(true).setMinValue(1))
-    .addIntegerOption((opt) =>
-      opt.setName('number').setDescription('Какая грань выпадет (1-6)').setRequired(true).setMinValue(1).setMaxValue(6)
-    ),
+    .setDescription('Открыть кости на ставку — первый, кто примет, сыграет 2 кубика против 2 кубиков')
+    .addIntegerOption((opt) => opt.setName('amount').setDescription('Ставка').setRequired(true).setMinValue(1)),
 
   async execute(interaction) {
-    const bet = interaction.options.getInteger('bet');
-    const guess = interaction.options.getInteger('number');
-    await interaction.deferReply({ ephemeral: true });
+    const amount = interaction.options.getInteger('amount');
+    await interaction.deferReply();
 
-    const wallet = await transactionService.getOrCreateWallet(interaction.guildId, interaction.user.id);
-    if (wallet.coins < bet) {
-      await interaction.editReply({ embeds: [errorEmbed(`Недостаточно монет. Баланс: **${wallet.coins.toLocaleString('ru-RU')}** ${COIN_ICON}`)] });
+    const challengerWallet = await transactionService.getOrCreateWallet(interaction.guildId, interaction.user.id);
+    if (challengerWallet.coins < amount) {
+      await interaction.editReply({ embeds: [errorEmbed(`Недостаточно монет для такой ставки. Баланс: **${challengerWallet.coins.toLocaleString('ru-RU')}** ${COIN_ICON}`)] });
       return;
     }
 
+    const duel = await duelService.createDuel({
+      guildId: interaction.guildId,
+      challengerId: interaction.user.id,
+      amount,
+      mode: 'dice',
+    });
+
+    const embed = baseEmbed({
+      title: 'Кости',
+      description: `${DIVIDER}\n${interaction.user} предлагает сыграть в кости, ставка **${amount.toLocaleString('ru-RU')}** ${COIN_ICON}`,
+    });
+    const row = new ActionRowBuilder().addComponents(
+      new ButtonBuilder().setCustomId(`dice:accept:${duel._id}`).setLabel('Принять').setStyle(ButtonStyle.Success),
+      new ButtonBuilder().setCustomId(`dice:cancel:${duel._id}`).setLabel('Отменить').setStyle(ButtonStyle.Secondary)
+    );
+
+    const message = await interaction.editReply({ embeds: [embed], components: [row] });
+
+    let choice;
     try {
-      const idBase = interaction.id;
+      choice = await message.awaitMessageComponent({ componentType: ComponentType.Button, time: 120_000 });
+    } catch {
+      await duelService.expireDuel(duel._id);
+      await interaction.editReply({ embeds: [errorEmbed('Никто не принял вызов вовремя. Игра отменена.')], components: [] });
+      return;
+    }
 
-      const afterDebit = await transactionService.applyDelta({
-        guildId: interaction.guildId,
-        userId: interaction.user.id,
-        currency: 'coins',
-        amount: -bet,
-        type: 'game_loss',
-        idempotencyKey: `dice:${idBase}:bet`,
-      });
+    const action = choice.customId.split(':')[1];
 
-      const serverSeed = gameFairnessService.generateServerSeed();
-      const { result, proofHash } = gameFairnessService.dice({
-        serverSeed,
-        clientSeed: interaction.user.id,
-        nonce: idBase,
-      });
-
-      const won = result === guess;
-      let finalWallet = afterDebit;
-      const payout = bet * PAYOUT_MULTIPLIER;
-
-      if (won) {
-        finalWallet = await transactionService.applyDelta({
-          guildId: interaction.guildId,
-          userId: interaction.user.id,
-          currency: 'coins',
-          amount: payout,
-          type: 'game_win',
-          idempotencyKey: `dice:${idBase}:payout`,
-        });
+    if (action === 'cancel') {
+      if (choice.user.id !== interaction.user.id) {
+        await choice.reply({ content: 'Только тот, кто предложил игру, может её отменить.', ephemeral: true });
+        return;
       }
+      await duelService.cancelDuel(duel._id);
+      await choice.update({ embeds: [baseEmbed({ title: 'Игра отменена', description: `${DIVIDER}\n${interaction.user} отменил предложение.` })], components: [] });
+      return;
+    }
+
+    let claimedDuel;
+    try {
+      claimedDuel = await duelService.claimDuel(duel._id, choice.user.id);
+    } catch (err) {
+      if (err instanceof DuelAlreadyTakenError) {
+        const reason = choice.user.id === interaction.user.id
+          ? 'Нельзя принять свою же игру.'
+          : 'Кто-то уже принял эту игру раньше вас.';
+        await choice.reply({ embeds: [errorEmbed(reason)], ephemeral: true });
+        return;
+      }
+      throw err;
+    }
+
+    const opponent = choice.user;
+    await choice.update({
+      embeds: [baseEmbed({ title: 'Кости брошены...', description: `${DIVIDER}\n${interaction.user} vs ${opponent}` })],
+      components: [],
+    });
+
+    try {
+      const { winnerId, pot, rolls } = await duelService.acceptDuel(claimedDuel._id);
+      const winnerUser = winnerId === interaction.user.id ? interaction.user : opponent;
 
       const resultEmbed = baseEmbed({
-        title: won ? 'Вы выиграли' : 'Вы проиграли',
+        title: `Победа ${winnerUser.username}`,
         description:
           `${DIVIDER}\n` +
-          `Выпало: **${result}** · Вы поставили на: **${guess}**\n` +
-          `${won ? `Выигрыш: **+${payout.toLocaleString('ru-RU')}** (×${PAYOUT_MULTIPLIER})` : `Проигрыш: **-${bet.toLocaleString('ru-RU')}**`} ${COIN_ICON}\n\n` +
-          `Баланс: **${finalWallet.coins.toLocaleString('ru-RU')}** ${COIN_ICON}\n` +
-          `-# proof: ${proofHash.slice(0, 16)}...`,
-        color: won ? config.colors.success : config.colors.danger,
+          `${interaction.user}: ${formatRoll(rolls.challenger)} — **${rolls.challengerSum}**\n` +
+          `${opponent}: ${formatRoll(rolls.opponent)} — **${rolls.opponentSum}**\n\n` +
+          `🏆 ${winnerUser} забирает **${pot.toLocaleString('ru-RU')}** ${COIN_ICON}`,
+        color: config.colors.success,
       });
-      const customDiceGifUrl = config.assets.pickRandomGif(config.assets.diceGifUrls);
-      let files = [];
-      if (customDiceGifUrl) {
-        resultEmbed.setImage(customDiceGifUrl);
-      } else {
-        const gifBuffer = generateDiceGif();
-        const attachment = new AttachmentBuilder(gifBuffer, { name: 'dice.gif' });
-        resultEmbed.setImage('attachment://dice.gif');
-        files = [attachment];
-      }
-
-      await interaction.editReply({ embeds: [resultEmbed], files });
+      await interaction.followUp({ embeds: [resultEmbed] });
     } catch (err) {
       if (err instanceof InsufficientFundsError) {
-        await interaction.editReply({ embeds: [errorEmbed('Недостаточно средств на момент броска.')] });
+        await interaction.followUp({ embeds: [errorEmbed('У одного из участников не хватило монет на момент принятия. Игра отменена, ставки не списаны.')] });
         return;
       }
-      if (err instanceof DuplicateActionError) {
-        await interaction.editReply({ embeds: [errorEmbed('Этот бросок уже был выполнен.')] });
+      if (err instanceof DuelNotPendingError) {
+        await interaction.followUp({ embeds: [errorEmbed('Эта игра уже была обработана.')] });
         return;
       }
-      interaction.client.logger?.error?.('[/dice]', err);
-      await interaction.editReply({ embeds: [errorEmbed()] });
+      interaction.client.logger?.error?.('[/dice accept]', err);
+      await interaction.followUp({ embeds: [errorEmbed()] });
     }
   },
 };

@@ -5,7 +5,10 @@ const { InsufficientFundsError, DuplicateActionError } = require('../services/Tr
 const { baseEmbed, errorEmbed, DIVIDER, COIN_ICON, DONATE_ICON } = require('../utils/embeds');
 const config = require('../config');
 
-const BOX_LABELS = { 1: 'Первый', 2: 'Второй', 3: 'Третий' };
+const emojiIds = require('../generated/emojiIds.json');
+
+const BOX_LABELS = { 1: '1', 2: '2', 3: '3' }; // фоллбэк, пока кастомные emoji не загружены
+const BOX_EMOJI_IDS = { 1: emojiIds.giftbox1, 2: emojiIds.giftbox2, 3: emojiIds.giftbox3 };
 const GUESS_ROUND_MINUTES = 10;
 
 function icon(currency) {
@@ -98,13 +101,19 @@ function guessGiftRoundEmbed(hiderUser, amount, statusText) {
 
 function guessGiftButtons(roundId, disabled = false) {
   return new ActionRowBuilder().addComponents(
-    [1, 2, 3].map((box) =>
-      new ButtonBuilder()
+    [1, 2, 3].map((box) => {
+      const btn = new ButtonBuilder()
         .setCustomId(`giftguess:pick:${roundId}:${box}`)
-        .setLabel(BOX_LABELS[box])
         .setStyle(ButtonStyle.Primary)
-        .setDisabled(disabled)
-    )
+        .setDisabled(disabled);
+      // Кастомная эмодзи-коробка вместо цифры, если npm run upload-app-emoji уже запускался.
+      if (BOX_EMOJI_IDS[box]) {
+        btn.setEmoji({ id: BOX_EMOJI_IDS[box], name: `giftbox${box}` });
+      } else {
+        btn.setLabel(BOX_LABELS[box]);
+      }
+      return btn;
+    })
   );
 }
 

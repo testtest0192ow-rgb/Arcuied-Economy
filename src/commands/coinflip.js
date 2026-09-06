@@ -1,6 +1,7 @@
-const { SlashCommandBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType } = require('discord.js');
+const { SlashCommandBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType, AttachmentBuilder } = require('discord.js');
 const { transactionService, InsufficientFundsError, DuplicateActionError } = require('../services/TransactionService');
 const { gameFairnessService } = require('../services/GameFairnessService');
+const { generateCoinflipGif } = require('../services/AnimatedGifService');
 const { baseEmbed, errorEmbed, DIVIDER, COIN_ICON } = require('../utils/embeds');
 const config = require('../config');
 
@@ -14,7 +15,7 @@ module.exports = {
 
   async execute(interaction) {
     const bet = interaction.options.getInteger('bet');
-    await interaction.deferReply({ ephemeral: true });
+    await interaction.deferReply();
 
     const wallet = await transactionService.getOrCreateWallet(interaction.guildId, interaction.user.id);
     if (wallet.coins < bet) {
@@ -46,8 +47,6 @@ module.exports = {
 
     const pickedSide = choice.customId.split(':')[1];
 
-    // Короткая "подбрасываем" стадия без гифки — какая именно гифка (орёл/решка)
-    // нужна, мы узнаём только после резолва результата.
     await choice.update({
       embeds: [baseEmbed({ title: 'Подбрасываем...', description: `${DIVIDER}\nВы выбрали: **${SIDE_LABEL[pickedSide]}**` })],
       components: [],
@@ -56,7 +55,6 @@ module.exports = {
     try {
       const idBase = interaction.id;
 
-      // Escrow the bet first — atomic debit, rejects if funds insufficient at this exact moment.
       const afterDebit = await transactionService.applyDelta({
         guildId: interaction.guildId,
         userId: interaction.user.id,
@@ -67,7 +65,7 @@ module.exports = {
       });
 
       const serverSeed = gameFairnessService.generateServerSeed();
-      const { result, proofHash } = gameFairnessService.coinflip({
+      const { result } = gameFairnessService.coinflip({
         serverSeed,
         clientSeed: interaction.user.id,
         nonce: idBase,
@@ -87,26 +85,31 @@ module.exports = {
         });
       }
 
-      // Гифка соответствует тому, что реально выпало (result), а не тому, что выбрал игрок.
-      const resultGifUrl = config.assets.pickRandomGif(
-        result === 'heads' ? config.assets.coinflipHeadsGifUrls : config.assets.coinflipTailsGifUrls
-      );
-
       const resultEmbed = baseEmbed({
         title: won ? 'Вы выиграли' : 'Вы проиграли',
         description:
           `${DIVIDER}\n` +
           `Выпало: **${SIDE_LABEL[result]}** · Вы выбрали: **${SIDE_LABEL[pickedSide]}**\n` +
           `${won ? `Выигрыш: **+${bet.toLocaleString('ru-RU')}**` : `Проигрыш: **-${bet.toLocaleString('ru-RU')}**`} ${COIN_ICON}\n\n` +
-          `Баланс: **${finalWallet.coins.toLocaleString('ru-RU')}** ${COIN_ICON}\n` +
-          `-# proof: ${proofHash.slice(0, 16)}...`,
+          `Баланс: **${finalWallet.coins.toLocaleString('ru-RU')}** ${COIN_ICON}`,
         color: won ? config.colors.success : config.colors.danger,
       });
-      if (resultGifUrl) {
-        resultEmbed.setImage(resultGifUrl);
+
+      // Свой URL из .env имеет приоритет; иначе — сгенерированная анимация с подписью результата.
+      const customGifUrl = config.assets.pickRandomGif(
+        result === 'heads' ? config.assets.coinflipHeadsGifUrls : config.assets.coinflipTailsGifUrls
+      );
+      let files = [];
+      if (customGifUrl) {
+        resultEmbed.setImage(customGifUrl);
+      } else {
+        const gifBuffer = generateCoinflipGif(result);
+        const attachment = new AttachmentBuilder(gifBuffer, { name: 'coinflip.gif' });
+        resultEmbed.setImage('attachment://coinflip.gif');
+        files = [attachment];
       }
 
-      await interaction.editReply({ embeds: [resultEmbed], components: [] });
+      await interaction.editReply({ embeds: [resultEmbed], components: [], files });
     } catch (err) {
       if (err instanceof InsufficientFundsError) {
         await interaction.editReply({ embeds: [errorEmbed('Недостаточно средств на момент броска.')], components: [] });

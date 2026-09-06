@@ -16,7 +16,7 @@ module.exports = {
   data: new SlashCommandBuilder().setName('timely').setDescription('Забрать периодическую награду'),
 
   async execute(interaction) {
-    await interaction.deferReply({ ephemeral: true });
+    await interaction.deferReply();
 
     try {
       const { wallet, reward, streak } = await transactionService.claimTimely({

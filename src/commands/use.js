@@ -18,7 +18,7 @@ module.exports = {
 
   async execute(interaction) {
     const itemKey = interaction.options.getString('item');
-    await interaction.deferReply({ ephemeral: true });
+    await interaction.deferReply();
 
     try {
       const { item } = await itemService.useItem({

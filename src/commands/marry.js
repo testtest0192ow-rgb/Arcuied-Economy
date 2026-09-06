@@ -20,7 +20,7 @@ module.exports = {
     const targetUser = interaction.options.getUser('user');
 
     if (divorce) {
-      await interaction.deferReply({ ephemeral: true });
+      await interaction.deferReply();
       try {
         await relationshipService.divorce({ guildId: interaction.guildId, userId: interaction.user.id });
         const embed = baseEmbed({ title: 'Развод оформлен', description: 'Вы больше не в браке.' });
@@ -38,7 +38,7 @@ module.exports = {
     }
 
     if (!targetUser) {
-      await interaction.deferReply({ ephemeral: true });
+      await interaction.deferReply();
       const marriage = await relationshipService.getActiveMarriage(interaction.guildId, interaction.user.id);
       if (!marriage) {
         const embed = baseEmbed({ title: 'Отношения', description: 'Вы не состоите в браке. Сделайте предложение через `/marry user:@кто-то`.' });

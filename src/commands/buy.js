@@ -30,7 +30,7 @@ module.exports = {
     const itemKey = interaction.options.getString('item');
     const quantity = interaction.options.getInteger('quantity') || 1;
 
-    await interaction.deferReply({ ephemeral: true });
+    await interaction.deferReply();
 
     try {
       const itemPreview = await itemService.getItem(interaction.guildId, itemKey);

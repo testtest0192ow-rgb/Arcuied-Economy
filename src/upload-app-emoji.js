@@ -83,9 +83,23 @@ function sanitizeName(rawName) {
   }
 
   if (results.length > 0) {
-    console.log('\n--- Готовые строки для вставки в код ---');
+    console.log('\n--- Готовые строки для вставки в код (если нужно вручную) ---');
     for (const r of results) {
       console.log(`${r.name.toUpperCase()}_EMOJI=<:${r.name}:${r.id}>`);
     }
+
+    // Автоматически сохраняем в JSON — embeds.js/gifts.js/config.js подхватят эти ID
+    // сами при следующем запуске бота, руками копировать ничего не нужно.
+    const outputPath = path.join(__dirname, 'generated', 'emojiIds.json');
+    let merged = {};
+    if (fs.existsSync(outputPath)) {
+      try { merged = JSON.parse(fs.readFileSync(outputPath, 'utf8')); } catch { /* игнорируем битый файл, перезапишем */ }
+    }
+    for (const r of results) merged[r.name] = r.id;
+
+    fs.mkdirSync(path.dirname(outputPath), { recursive: true });
+    fs.writeFileSync(outputPath, JSON.stringify(merged, null, 2) + '\n');
+    console.log(`\n✅ Сохранено в ${outputPath}`);
+    console.log('Закоммить и запушь этот файл (src/generated/emojiIds.json) — после деплоя новые emoji заработают сами.');
   }
 })();

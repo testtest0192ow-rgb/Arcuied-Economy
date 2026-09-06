@@ -14,7 +14,7 @@ module.exports = {
 
   async execute(interaction) {
     const targetUser = interaction.options.getUser('user');
-    await interaction.deferReply({ ephemeral: true });
+    await interaction.deferReply();
 
     if (targetUser.id === interaction.user.id) {
       await interaction.editReply({ embeds: [errorEmbed('Нельзя выдать репутацию самому себе.')] });

@@ -11,7 +11,7 @@ module.exports = {
     .addUserOption((opt) => opt.setName('user').setDescription('Чей профиль посмотреть').setRequired(false)),
 
   async execute(interaction) {
-    await interaction.deferReply({ ephemeral: true });
+    await interaction.deferReply();
 
     const targetUser = interaction.options.getUser('user') || interaction.user;
 

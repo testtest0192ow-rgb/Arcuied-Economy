@@ -4,8 +4,10 @@ const duelSchema = new Schema(
   {
     guildId: { type: String, required: true, index: true },
     challengerId: { type: String, required: true },
-    opponentId: { type: String, required: true },
+    opponentId: { type: String, default: null },
     amount: { type: Number, required: true, min: 1 },
+    mode: { type: String, enum: ['coinflip', 'dice'], default: 'coinflip' },
+    rolls: { type: Schema.Types.Mixed, default: null }, // { challenger: [n,n], opponent: [n,n] } для mode='dice'
     status: {
       type: String,
       enum: ['pending', 'accepted', 'declined', 'cancelled', 'expired', 'completed'],

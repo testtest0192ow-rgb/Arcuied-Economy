@@ -56,7 +56,7 @@ module.exports = {
   data: new SlashCommandBuilder().setName('shop').setDescription('Открыть магазин'),
 
   async execute(interaction) {
-    await interaction.deferReply({ ephemeral: true });
+    await interaction.deferReply();
 
     try {
       const allItems = await itemService.listShop(interaction.guildId);

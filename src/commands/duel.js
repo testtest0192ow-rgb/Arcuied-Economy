@@ -1,30 +1,18 @@
 const { SlashCommandBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType, AttachmentBuilder } = require('discord.js');
-const { duelService, DuelNotPendingError } = require('../services/DuelService');
+const { duelService, DuelNotPendingError, DuelAlreadyTakenError } = require('../services/DuelService');
 const { transactionService, InsufficientFundsError } = require('../services/TransactionService');
-const { generateDuelGif } = require('../services/AnimatedGifService');
+const { generateDuelGif, generateDuelResultGif } = require('../services/AnimatedGifService');
 const { baseEmbed, errorEmbed, DIVIDER, COIN_ICON } = require('../utils/embeds');
 const config = require('../config');
 
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('duel')
-    .setDescription('Вызвать другого участника на дуэль')
-    .addUserOption((opt) => opt.setName('user').setDescription('Кого вызвать').setRequired(true))
+    .setDescription('Открыть дуэль на ставку — первый, кто примет, сыграет')
     .addIntegerOption((opt) => opt.setName('amount').setDescription('Ставка').setRequired(true).setMinValue(1)),
 
   async execute(interaction) {
-    const opponent = interaction.options.getUser('user');
     const amount = interaction.options.getInteger('amount');
-
-    if (opponent.id === interaction.user.id) {
-      await interaction.reply({ embeds: [errorEmbed('Нельзя вызвать на дуэль самого себя.')], ephemeral: true });
-      return;
-    }
-    if (opponent.bot) {
-      await interaction.reply({ embeds: [errorEmbed('Нельзя вызвать бота на дуэль.')], ephemeral: true });
-      return;
-    }
-
     await interaction.deferReply();
 
     const challengerWallet = await transactionService.getOrCreateWallet(interaction.guildId, interaction.user.id);
@@ -33,39 +21,33 @@ module.exports = {
       return;
     }
 
+    // opponentId не задаётся здесь — дуэль открыта всем, занимается первым, кто нажмёт "Принять".
     const duel = await duelService.createDuel({
       guildId: interaction.guildId,
       challengerId: interaction.user.id,
-      opponentId: opponent.id,
       amount,
     });
 
     const embed = baseEmbed({
       title: 'Дуэль',
-      description: `${DIVIDER}\nСтавка: **${amount.toLocaleString('ru-RU')}** ${COIN_ICON} с каждой стороны`,
-    }).addFields(
-      { name: 'Слева', value: `${interaction.user}`, inline: true },
-      { name: 'VS', value: '⚔️', inline: true },
-      { name: 'Справа', value: `${opponent}`, inline: true }
-    );
+      description: `${DIVIDER}\n${interaction.user} ищет соперника для дуэли, ставка **${amount.toLocaleString('ru-RU')}** ${COIN_ICON}`,
+    });
     const row = new ActionRowBuilder().addComponents(
       new ButtonBuilder().setCustomId(`duel:accept:${duel._id}`).setLabel('Принять').setStyle(ButtonStyle.Success),
-      new ButtonBuilder().setCustomId(`duel:decline:${duel._id}`).setLabel('Отклонить').setStyle(ButtonStyle.Danger),
       new ButtonBuilder().setCustomId(`duel:cancel:${duel._id}`).setLabel('Отменить').setStyle(ButtonStyle.Secondary)
     );
 
-    const message = await interaction.editReply({ content: `${opponent}`, embeds: [embed], components: [row] });
+    const message = await interaction.editReply({ embeds: [embed], components: [row] });
 
     let choice;
     try {
       choice = await message.awaitMessageComponent({
         componentType: ComponentType.Button,
-        time: 60_000,
-        filter: (i) => [opponent.id, interaction.user.id].includes(i.user.id),
+        time: 120_000,
       });
     } catch {
       await duelService.expireDuel(duel._id);
-      await interaction.editReply({ content: null, embeds: [errorEmbed('Время на ответ истекло. Дуэль отменена.')], components: [] });
+      await interaction.editReply({ embeds: [errorEmbed('Никто не принял вызов вовремя. Дуэль отменена.')], components: [] });
       return;
     }
 
@@ -73,28 +55,31 @@ module.exports = {
 
     if (action === 'cancel') {
       if (choice.user.id !== interaction.user.id) {
-        await choice.reply({ content: 'Только тот, кто вызвал на дуэль, может её отменить.', ephemeral: true });
+        await choice.reply({ content: 'Только тот, кто открыл дуэль, может её отменить.', ephemeral: true });
         return;
       }
       await duelService.cancelDuel(duel._id);
-      await choice.update({ content: null, embeds: [baseEmbed({ title: 'Дуэль отменена', description: `${DIVIDER}\n${interaction.user} отменил вызов.` })], components: [] });
+      await choice.update({ embeds: [baseEmbed({ title: 'Дуэль отменена', description: `${DIVIDER}\n${interaction.user} отменил вызов.` })], components: [] });
       return;
     }
 
-    if (choice.user.id !== opponent.id) {
-      await choice.reply({ content: 'Только вызванный участник может принять или отклонить дуэль.', ephemeral: true });
-      return;
+    // action === 'accept' — первый, кто нажал, атомарно занимает слот соперника.
+    let claimedDuel;
+    try {
+      claimedDuel = await duelService.claimDuel(duel._id, choice.user.id);
+    } catch (err) {
+      if (err instanceof DuelAlreadyTakenError) {
+        const reason = choice.user.id === interaction.user.id
+          ? 'Нельзя принять свой же вызов.'
+          : 'Кто-то уже принял эту дуэль раньше вас.';
+        await choice.reply({ embeds: [errorEmbed(reason)], ephemeral: true });
+        return;
+      }
+      throw err;
     }
 
-    if (action === 'decline') {
-      await duelService.declineDuel(duel._id);
-      await choice.update({ content: null, embeds: [baseEmbed({ title: 'Дуэль отклонена', description: `${DIVIDER}\n${opponent} отклонил вызов.` })], components: [] });
-      return;
-    }
+    const opponent = choice.user;
 
-    // action === 'accept'
-    // Порядок фиксирован везде: слева — challenger (тот, кто вызвал), справа — opponent
-    // (кого вызвали). Гифка дуэли ожидает именно такой порядок сторон.
     const startedEmbed = baseEmbed({
       title: 'Дуэль началась',
       description: `${DIVIDER}\nСтавка: **${amount.toLocaleString('ru-RU')}** ${COIN_ICON}`,
@@ -104,8 +89,6 @@ module.exports = {
       { name: 'Справа', value: `${opponent}`, inline: true }
     );
 
-    // Если в .env задана своя гифка — используем её (приоритет над сгенерированной).
-    // Иначе рисуем свою собственную анимацию сами — оригинальную, без чужих ассетов.
     const customDuelGifUrl = config.assets.pickRandomGif(config.assets.duelGifUrls);
     let files = [];
     if (customDuelGifUrl) {
@@ -116,19 +99,23 @@ module.exports = {
       startedEmbed.setImage('attachment://duel.gif');
       files = [attachment];
     }
-    await choice.update({ content: null, embeds: [startedEmbed], components: [], files });
+    await choice.update({ embeds: [startedEmbed], components: [], files });
 
     try {
-      const { winnerId, loserId, pot } = await duelService.acceptDuel(duel._id);
+      const { winnerId, loserId, pot } = await duelService.acceptDuel(claimedDuel._id);
       const winnerUser = winnerId === interaction.user.id ? interaction.user : opponent;
       const loserUser = loserId === interaction.user.id ? interaction.user : opponent;
 
+      const winnerSide = winnerId === interaction.user.id ? 'left' : 'right';
       const resultEmbed = baseEmbed({
         title: 'Дуэль завершена',
         description: `${DIVIDER}\n🏆 ${winnerUser} побеждает и забирает **${pot.toLocaleString('ru-RU')}** ${COIN_ICON}\n${loserUser} проигрывает ставку.`,
         color: config.colors.success,
       });
-      await interaction.followUp({ embeds: [resultEmbed] });
+      const resultGifBuffer = generateDuelResultGif(winnerSide);
+      const resultAttachment = new AttachmentBuilder(resultGifBuffer, { name: 'duel-result.gif' });
+      resultEmbed.setImage('attachment://duel-result.gif');
+      await interaction.followUp({ embeds: [resultEmbed], files: [resultAttachment] });
     } catch (err) {
       if (err instanceof InsufficientFundsError) {
         await interaction.followUp({ embeds: [errorEmbed('У одного из участников не хватило монет на момент принятия. Дуэль отменена, ставки не списаны.')] });

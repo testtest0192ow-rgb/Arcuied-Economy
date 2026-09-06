@@ -18,11 +18,18 @@ class DuelNotPendingError extends Error {
   }
 }
 
+class DuelAlreadyTakenError extends Error {
+  constructor() {
+    super('duel_already_taken');
+    this.name = 'DuelAlreadyTakenError';
+  }
+}
+
 class DuelService {
-  async createDuel({ guildId, challengerId, opponentId, amount }) {
-    if (challengerId === opponentId) throw new Error('Нельзя вызвать на дуэль самого себя');
+  /** opponentId теперь необязателен — открытый вызов, любой участник может принять первым. */
+  async createDuel({ guildId, challengerId, amount, mode = 'coinflip' }) {
     if (!Number.isInteger(amount) || amount <= 0) throw new Error('amount должен быть положительным целым');
-    return Duel.create({ guildId, challengerId, opponentId, amount, status: 'pending' });
+    return Duel.create({ guildId, challengerId, opponentId: null, amount, mode, status: 'pending' });
   }
 
   async declineDuel(duelId) {
@@ -39,6 +46,21 @@ class DuelService {
 
   async expireDuel(duelId) {
     return Duel.findOneAndUpdate({ _id: duelId, status: 'pending' }, { status: 'expired' }, { new: true });
+  }
+
+  /**
+   * Атомарно "занимает" открытую дуэль — первый, кто нажал "Принять", становится
+   * opponentId. findOneAndUpdate с условием opponentId:null гарантирует, что при
+   * одновременном клике двух людей слот достанется только одному.
+   */
+  async claimDuel(duelId, accepterId) {
+    const duel = await Duel.findOneAndUpdate(
+      { _id: duelId, status: 'pending', opponentId: null, challengerId: { $ne: accepterId } },
+      { opponentId: accepterId },
+      { new: true }
+    );
+    if (!duel) throw new DuelAlreadyTakenError();
+    return duel;
   }
 
   /**
@@ -69,13 +91,46 @@ class DuelService {
         );
         if (!opponentWallet) throw new InsufficientFundsError();
 
-        const { result: coinResult, proofHash } = gameFairnessService.coinflip({
-          serverSeed: gameFairnessService.generateServerSeed(),
-          clientSeed: `${duel.challengerId}:${duel.opponentId}`,
-          nonce: String(duel._id),
-        });
-        const winnerId = coinResult === 'heads' ? duel.challengerId : duel.opponentId;
-        const loserId = winnerId === duel.challengerId ? duel.opponentId : duel.challengerId;
+        let winnerId, loserId, proofHash, rolls = null;
+
+        if (duel.mode === 'dice') {
+          const serverSeed = gameFairnessService.generateServerSeed();
+          const rollPair = (side) => {
+            const a = gameFairnessService.dice({ serverSeed, clientSeed: `${duel._id}:${side}`, nonce: '1' });
+            const b = gameFairnessService.dice({ serverSeed, clientSeed: `${duel._id}:${side}`, nonce: '2' });
+            return { values: [a.result, b.result], sum: a.result + b.result, proofHash: a.proofHash };
+          };
+
+          let challengerRoll = rollPair('challenger');
+          let opponentRoll = rollPair('opponent');
+          let attempt = 0;
+          // Ничья — честный переброс до победителя (nonce меняется, чтобы не повторить тот же результат).
+          while (challengerRoll.sum === opponentRoll.sum && attempt < 5) {
+            attempt++;
+            challengerRoll = rollPair(`challenger:tie${attempt}`);
+            opponentRoll = rollPair(`opponent:tie${attempt}`);
+          }
+
+          winnerId = challengerRoll.sum >= opponentRoll.sum ? duel.challengerId : duel.opponentId;
+          loserId = winnerId === duel.challengerId ? duel.opponentId : duel.challengerId;
+          proofHash = challengerRoll.proofHash;
+          rolls = {
+            challenger: challengerRoll.values,
+            opponent: opponentRoll.values,
+            challengerSum: challengerRoll.sum,
+            opponentSum: opponentRoll.sum,
+          };
+        } else {
+          const { result: coinResult, proofHash: coinProof } = gameFairnessService.coinflip({
+            serverSeed: gameFairnessService.generateServerSeed(),
+            clientSeed: `${duel.challengerId}:${duel.opponentId}`,
+            nonce: String(duel._id),
+          });
+          winnerId = coinResult === 'heads' ? duel.challengerId : duel.opponentId;
+          loserId = winnerId === duel.challengerId ? duel.opponentId : duel.challengerId;
+          proofHash = coinProof;
+        }
+
         const pot = duel.amount * 2;
 
         const winnerWallet = await Wallet.findOneAndUpdate(
@@ -115,9 +170,10 @@ class DuelService {
         duel.status = 'completed';
         duel.winnerId = winnerId;
         duel.proofHash = proofHash;
+        duel.rolls = rolls;
         await duel.save({ session });
 
-        result = { duel, winnerId, loserId, pot };
+        result = { duel, winnerId, loserId, pot, rolls };
       });
       return result;
     } catch (err) {
@@ -150,4 +206,4 @@ class DuelService {
   }
 }
 
-module.exports = { duelService: new DuelService(), DuelNotFoundError, DuelNotPendingError };
+module.exports = { duelService: new DuelService(), DuelNotFoundError, DuelNotPendingError, DuelAlreadyTakenError };

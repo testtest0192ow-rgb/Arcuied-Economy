@@ -36,7 +36,7 @@ module.exports = {
     const itemKey = interaction.options.getString('item');
     const quantity = interaction.options.getInteger('quantity') || 1;
 
-    await interaction.deferReply({ ephemeral: true });
+    await interaction.deferReply();
 
     let item;
     try {

@@ -28,7 +28,7 @@ module.exports = {
   data: new SlashCommandBuilder().setName('leaderboard').setDescription('Открыть рейтинг сервера'),
 
   async execute(interaction) {
-    await interaction.deferReply({ ephemeral: true });
+    await interaction.deferReply();
 
     try {
       const menu = new StringSelectMenuBuilder()
