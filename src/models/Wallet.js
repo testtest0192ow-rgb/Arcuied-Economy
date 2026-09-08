@@ -14,6 +14,9 @@ const walletSchema = new Schema(
     mogLosses: { type: Number, default: 0 },
     reputation: { type: Number, default: 0 },
     lastRepGivenAt: { type: Date, default: null }, // cooldown lives on the GIVER's wallet
+    messageCount: { type: Number, default: 0 },
+    xp: { type: Number, default: 0 },
+    level: { type: Number, default: 0 },
   },
   { timestamps: true }
 );

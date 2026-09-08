@@ -6,6 +6,7 @@ const {
   ComponentType,
 } = require('discord.js');
 const { transactionService, InsufficientFundsError, DuplicateActionError } = require('../services/TransactionService');
+const { questService } = require('../services/QuestService');
 const { baseEmbed, errorEmbed, DIVIDER, COIN_ICON } = require('../utils/embeds');
 const config = require('../config');
 
@@ -87,6 +88,8 @@ module.exports = {
         amount,
         idempotencyKey,
       });
+
+      await questService.increment(interaction.guild, interaction.user.id, 'give', 1).catch(() => {});
 
       const successEmbed = baseEmbed({
         title: 'Монеты переданы',

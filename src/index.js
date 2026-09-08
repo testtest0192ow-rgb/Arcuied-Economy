@@ -7,7 +7,7 @@ const { connectDatabase } = require('./database/connection');
 const logger = console;
 
 const client = new Client({
-  intents: [GatewayIntentBits.Guilds],
+  intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages],
 });
 client.logger = logger;
 client.commands = new Collection();

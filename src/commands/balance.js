@@ -31,7 +31,7 @@ module.exports = {
       // использовать embeds — весь контент идёт через компоненты.
       const header = new SectionBuilder()
         .addTextDisplayComponents(
-          new TextDisplayBuilder().setContent(`# Текущий баланс — ${targetUser.username}`)
+          new TextDisplayBuilder().setContent(`**Текущий баланс — ${targetUser.username}**`)
         )
         .setThumbnailAccessory(
           new ThumbnailBuilder().setURL(targetUser.displayAvatarURL({ extension: 'png', size: 256 }))

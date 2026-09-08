@@ -1,6 +1,7 @@
 const { SlashCommandBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType, AttachmentBuilder } = require('discord.js');
 const { transactionService } = require('../services/TransactionService');
 const { relationshipService } = require('../services/RelationshipService');
+const { levelService } = require('../services/LevelService');
 const { renderProfileCard } = require('../services/ProfileCardService');
 const { baseEmbed, errorEmbed, DIVIDER, COIN_ICON, DONATE_ICON } = require('../utils/embeds');
 
@@ -17,6 +18,7 @@ module.exports = {
 
     try {
       const wallet = await transactionService.getOrCreateWallet(interaction.guildId, targetUser.id);
+      const { currentXp, neededXp } = levelService.progressWithinLevel(wallet.xp || 0);
       const marriage = await relationshipService.getActiveMarriage(interaction.guildId, targetUser.id);
 
       let partnerUsername = null;
@@ -47,6 +49,10 @@ module.exports = {
             duelWins: wallet.duelWins || 0,
             duelLosses: wallet.duelLosses || 0,
             timelyStreak: wallet.timelyStreak || 0,
+            messageCount: wallet.messageCount || 0,
+            level: wallet.level || 0,
+            currentXp,
+            neededXp,
             title: null, // TODO: подключить, когда появится система титулов
             partnerUsername,
           },
@@ -67,7 +73,9 @@ module.exports = {
             `${DIVIDER}\n` +
             `${COIN_ICON} Монеты: **${wallet.coins.toLocaleString('ru-RU')}**\n` +
             `${DONATE_ICON} Донат-монеты: **${wallet.donateCoins.toLocaleString('ru-RU')}**\n` +
-            `Серия /timely: **${wallet.timelyStreak || 0}**`,
+            `Серия /timely: **${wallet.timelyStreak || 0}**\n` +
+            `Уровень: **${wallet.level || 0}**\n` +
+            `Сообщений: **${(wallet.messageCount || 0).toLocaleString('ru-RU')}**`,
         }).setThumbnail(targetUser.displayAvatarURL());
         message = await interaction.editReply({ embeds: [embed], components });
       }

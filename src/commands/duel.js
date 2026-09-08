@@ -1,7 +1,9 @@
 const { SlashCommandBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType, AttachmentBuilder } = require('discord.js');
 const { duelService, DuelNotPendingError, DuelAlreadyTakenError } = require('../services/DuelService');
 const { transactionService, InsufficientFundsError } = require('../services/TransactionService');
-const { generateDuelGif, generateDuelResultGif } = require('../services/AnimatedGifService');
+const { questService } = require('../services/QuestService');
+const { generateDuelGif } = require('../services/AnimatedGifService');
+const { buildDuelSceneCard } = require('../services/DuelSceneCardService');
 const { baseEmbed, errorEmbed, DIVIDER, COIN_ICON } = require('../utils/embeds');
 const config = require('../config');
 
@@ -9,10 +11,10 @@ module.exports = {
   data: new SlashCommandBuilder()
     .setName('duel')
     .setDescription('Открыть дуэль на ставку — первый, кто примет, сыграет')
-    .addIntegerOption((opt) => opt.setName('amount').setDescription('Ставка').setRequired(true).setMinValue(1)),
+    .addIntegerOption((opt) => opt.setName('ставка').setDescription('Ставка').setRequired(true).setMinValue(1)),
 
   async execute(interaction) {
-    const amount = interaction.options.getInteger('amount');
+    const amount = interaction.options.getInteger('ставка');
     await interaction.deferReply();
 
     const challengerWallet = await transactionService.getOrCreateWallet(interaction.guildId, interaction.user.id);
@@ -103,6 +105,8 @@ module.exports = {
 
     try {
       const { winnerId, loserId, pot } = await duelService.acceptDuel(claimedDuel._id);
+      await questService.increment(interaction.guild, interaction.user.id, 'activity', 1).catch(() => {});
+      await questService.increment(interaction.guild, opponent.id, 'activity', 1).catch(() => {});
       const winnerUser = winnerId === interaction.user.id ? interaction.user : opponent;
       const loserUser = loserId === interaction.user.id ? interaction.user : opponent;
 
@@ -112,9 +116,14 @@ module.exports = {
         description: `${DIVIDER}\n🏆 ${winnerUser} побеждает и забирает **${pot.toLocaleString('ru-RU')}** ${COIN_ICON}\n${loserUser} проигрывает ставку.`,
         color: config.colors.success,
       });
-      const resultGifBuffer = generateDuelResultGif(winnerSide);
-      const resultAttachment = new AttachmentBuilder(resultGifBuffer, { name: 'duel-result.gif' });
-      resultEmbed.setImage('attachment://duel-result.gif');
+      const leftUser = winnerId === interaction.user.id
+        ? { username: interaction.user.username, avatarURL: interaction.user.displayAvatarURL({ extension: 'png', size: 128 }) }
+        : { username: opponent.username, avatarURL: opponent.displayAvatarURL({ extension: 'png', size: 128 }) };
+      const rightUser = winnerId === interaction.user.id
+        ? { username: opponent.username, avatarURL: opponent.displayAvatarURL({ extension: 'png', size: 128 }) }
+        : { username: interaction.user.username, avatarURL: interaction.user.displayAvatarURL({ extension: 'png', size: 128 }) };
+      const resultAttachment = await buildDuelSceneCard({ leftUser, rightUser });
+      resultEmbed.setImage('attachment://duel-scene.png');
       await interaction.followUp({ embeds: [resultEmbed], files: [resultAttachment] });
     } catch (err) {
       if (err instanceof InsufficientFundsError) {

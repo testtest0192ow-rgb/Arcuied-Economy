@@ -1,6 +1,8 @@
 const { SlashCommandBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType } = require('discord.js');
 const { duelService, DuelNotPendingError, DuelAlreadyTakenError } = require('../services/DuelService');
 const { transactionService, InsufficientFundsError } = require('../services/TransactionService');
+const { questService } = require('../services/QuestService');
+const { buildDiceDuelCard } = require('../services/DiceDuelCardService');
 const { baseEmbed, errorEmbed, DIVIDER, COIN_ICON } = require('../utils/embeds');
 const config = require('../config');
 
@@ -11,10 +13,10 @@ module.exports = {
   data: new SlashCommandBuilder()
     .setName('dice')
     .setDescription('Открыть кости на ставку — первый, кто примет, сыграет 2 кубика против 2 кубиков')
-    .addIntegerOption((opt) => opt.setName('amount').setDescription('Ставка').setRequired(true).setMinValue(1)),
+    .addIntegerOption((opt) => opt.setName('ставка').setDescription('Ставка').setRequired(true).setMinValue(1)),
 
   async execute(interaction) {
-    const amount = interaction.options.getInteger('amount');
+    const amount = interaction.options.getInteger('ставка');
     await interaction.deferReply();
 
     const challengerWallet = await transactionService.getOrCreateWallet(interaction.guildId, interaction.user.id);
@@ -84,18 +86,27 @@ module.exports = {
 
     try {
       const { winnerId, pot, rolls } = await duelService.acceptDuel(claimedDuel._id);
+      await questService.increment(interaction.guild, interaction.user.id, 'activity', 1).catch(() => {});
+      await questService.increment(interaction.guild, opponent.id, 'activity', 1).catch(() => {});
       const winnerUser = winnerId === interaction.user.id ? interaction.user : opponent;
 
       const resultEmbed = baseEmbed({
         title: `Победа ${winnerUser.username}`,
-        description:
-          `${DIVIDER}\n` +
-          `${interaction.user}: ${formatRoll(rolls.challenger)} — **${rolls.challengerSum}**\n` +
-          `${opponent}: ${formatRoll(rolls.opponent)} — **${rolls.opponentSum}**\n\n` +
-          `🏆 ${winnerUser} забирает **${pot.toLocaleString('ru-RU')}** ${COIN_ICON}`,
+        description: `${DIVIDER}\n🏆 ${winnerUser} забирает **${pot.toLocaleString('ru-RU')}** ${COIN_ICON}`,
         color: config.colors.success,
       });
-      await interaction.followUp({ embeds: [resultEmbed] });
+
+      const cardAttachment = await buildDiceDuelCard({
+        leftUser: { username: interaction.user.username, avatarURL: interaction.user.displayAvatarURL({ extension: 'png', size: 128 }) },
+        rightUser: { username: opponent.username, avatarURL: opponent.displayAvatarURL({ extension: 'png', size: 128 }) },
+        leftRolls: rolls.challenger,
+        rightRolls: rolls.opponent,
+        leftSum: rolls.challengerSum,
+        rightSum: rolls.opponentSum,
+      });
+      resultEmbed.setImage('attachment://dice-duel.png');
+
+      await interaction.followUp({ embeds: [resultEmbed], files: [cardAttachment] });
     } catch (err) {
       if (err instanceof InsufficientFundsError) {
         await interaction.followUp({ embeds: [errorEmbed('У одного из участников не хватило монет на момент принятия. Игра отменена, ставки не списаны.')] });

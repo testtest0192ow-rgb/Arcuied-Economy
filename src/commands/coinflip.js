@@ -1,4 +1,6 @@
 const { SlashCommandBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType, AttachmentBuilder } = require('discord.js');
+const fs = require('fs');
+const path = require('path');
 const { transactionService, InsufficientFundsError, DuplicateActionError } = require('../services/TransactionService');
 const { gameFairnessService } = require('../services/GameFairnessService');
 const { generateCoinflipGif } = require('../services/AnimatedGifService');
@@ -95,12 +97,19 @@ module.exports = {
         color: won ? config.colors.success : config.colors.danger,
       });
 
-      // Свой URL из .env имеет приоритет; иначе — сгенерированная анимация с подписью результата.
+      // Приоритет: локальный файл в assets/gifs/ (не истекает) → ссылка из .env
+      // (Discord CDN-ссылки с подписью ex=/is=/hm= ИСТЕКАЮТ примерно через сутки —
+      // не хранить их как постоянный источник) → сгенерированная анимация.
+      const localGifPath = path.join(__dirname, '..', '..', 'assets', 'gifs', result === 'heads' ? 'coinflip-heads.gif' : 'coinflip-tails.gif');
       const customGifUrl = config.assets.pickRandomGif(
         result === 'heads' ? config.assets.coinflipHeadsGifUrls : config.assets.coinflipTailsGifUrls
       );
       let files = [];
-      if (customGifUrl) {
+      if (fs.existsSync(localGifPath)) {
+        const attachment = new AttachmentBuilder(localGifPath, { name: 'coinflip.gif' });
+        resultEmbed.setImage('attachment://coinflip.gif');
+        files = [attachment];
+      } else if (customGifUrl) {
         resultEmbed.setImage(customGifUrl);
       } else {
         const gifBuffer = generateCoinflipGif(result);

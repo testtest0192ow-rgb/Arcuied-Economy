@@ -28,7 +28,7 @@ function ensureFontsRegistered(logger = console) {
 const FONT_BOLD = () => (usingBundledFont ? 'ARCUEID-Bold' : 'sans-serif');
 const FONT_REGULAR = () => (usingBundledFont ? 'ARCUEID-Regular' : 'sans-serif');
 
-const WIDTH = 1000;
+const WIDTH = 1200;
 const HEIGHT = 380;
 
 function roundedRect(ctx, x, y, w, h, r) {
@@ -76,6 +76,10 @@ function drawChip(ctx, x, y, label, value, accentColor) {
  * @param {number} data.duelWins
  * @param {number} data.duelLosses
  * @param {number} data.timelyStreak
+ * @param {number} data.messageCount
+ * @param {number} data.level
+ * @param {number} data.currentXp
+ * @param {number} data.neededXp
  * @param {string|null} data.title - косметический титул, если есть
  * @param {string|null} data.partnerUsername - если в браке
  * @returns {Promise<Buffer>} PNG buffer, готов передать в discord.js AttachmentBuilder
@@ -174,11 +178,39 @@ async function renderProfileCard(data, logger = console) {
   ctx.font = `bold 36px ${FONT_BOLD()}`;
   ctx.fillText(data.donateCoins.toLocaleString('ru-RU'), donateColX, currencyY + 38);
 
+  // Уровень + прогресс-бар опыта — между валютами и чипами статистики.
+  const levelY = 250;
+  const barWidth = 860;
+  ctx.fillStyle = '#ffffff';
+  ctx.font = `bold 22px ${FONT_BOLD()}`;
+  ctx.fillText(`Уровень ${data.level || 0}`, rightColX, levelY);
+
+  const barX = rightColX;
+  const barY = levelY + 10;
+  const barHeight = 10;
+  ctx.fillStyle = 'rgba(255,255,255,0.08)';
+  roundedRect(ctx, barX, barY, barWidth, barHeight, barHeight / 2);
+  ctx.fill();
+
+  const progress = data.neededXp > 0 ? Math.min(1, (data.currentXp || 0) / data.neededXp) : 0;
+  if (progress > 0) {
+    ctx.fillStyle = '#8b5cf6';
+    roundedRect(ctx, barX, barY, Math.max(barHeight, barWidth * progress), barHeight, barHeight / 2);
+    ctx.fill();
+  }
+
+  ctx.fillStyle = 'rgba(255,255,255,0.45)';
+  ctx.font = `16px ${FONT_REGULAR()}`;
+  ctx.textAlign = 'right';
+  ctx.fillText(`${(data.currentXp || 0).toLocaleString('ru-RU')} / ${(data.neededXp || 0).toLocaleString('ru-RU')} XP`, barX + barWidth, barY - 6);
+  ctx.textAlign = 'left';
+
   // Нижний ряд чипов — статистика.
   const chipY = 280;
   drawChip(ctx, rightColX, chipY, 'Репутация', String(data.reputation), '#22c55e');
-  drawChip(ctx, rightColX + 225, chipY, 'Дуэли (П/Пор)', `${data.duelWins}/${data.duelLosses}`, '#ef4444');
-  drawChip(ctx, rightColX + 450, chipY, 'Серия /timely', String(data.timelyStreak), '#f59e0b');
+  drawChip(ctx, rightColX + 215, chipY, 'Дуэли (П/Пор)', `${data.duelWins}/${data.duelLosses}`, '#ef4444');
+  drawChip(ctx, rightColX + 430, chipY, 'Серия /timely', String(data.timelyStreak), '#f59e0b');
+  drawChip(ctx, rightColX + 645, chipY, 'Сообщения', (data.messageCount || 0).toLocaleString('ru-RU'), '#3b82f6');
 
   return canvas.encode('png');
 }
