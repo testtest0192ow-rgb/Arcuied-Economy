@@ -1,11 +1,35 @@
-const { SlashCommandBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType, AttachmentBuilder } = require('discord.js');
+const {
+  SlashCommandBuilder,
+  ActionRowBuilder,
+  ButtonBuilder,
+  ButtonStyle,
+  ComponentType,
+  AttachmentBuilder,
+  ContainerBuilder,
+  SeparatorBuilder,
+  SeparatorSpacingSize,
+  TextDisplayBuilder,
+  MediaGalleryBuilder,
+  MediaGalleryItemBuilder,
+  MessageFlags,
+} = require('discord.js');
 const { duelService, DuelNotPendingError, DuelAlreadyTakenError } = require('../services/DuelService');
 const { transactionService, InsufficientFundsError } = require('../services/TransactionService');
 const { questService } = require('../services/QuestService');
 const { generateDuelGif } = require('../services/AnimatedGifService');
 const { buildDuelSceneCard } = require('../services/DuelSceneCardService');
-const { baseEmbed, errorEmbed, DIVIDER, COIN_ICON } = require('../utils/embeds');
+const { errorEmbed, COIN_ICON } = require('../utils/embeds');
 const config = require('../config');
+
+// Тот же паттерн, что и в /dice: "-# категория" + жирный заголовок + Separator + текст.
+// Серый акцент по умолчанию, зелёный/красный только на реальном исходе (победа/отмена).
+function duelContainer({ heading, body, color = config.colors.primary }) {
+  const container = new ContainerBuilder().setAccentColor(color);
+  container.addTextDisplayComponents(new TextDisplayBuilder().setContent(`-# Дуэль\n**${heading}**`));
+  container.addSeparatorComponents(new SeparatorBuilder().setDivider(true).setSpacing(SeparatorSpacingSize.Small));
+  container.addTextDisplayComponents(new TextDisplayBuilder().setContent(body));
+  return container;
+}
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -30,16 +54,17 @@ module.exports = {
       amount,
     });
 
-    const embed = baseEmbed({
-      title: 'Дуэль',
-      description: `${DIVIDER}\n${interaction.user} ищет соперника для дуэли, ставка **${amount.toLocaleString('ru-RU')}** ${COIN_ICON}`,
-    });
     const row = new ActionRowBuilder().addComponents(
       new ButtonBuilder().setCustomId(`duel:accept:${duel._id}`).setLabel('Принять').setStyle(ButtonStyle.Success),
       new ButtonBuilder().setCustomId(`duel:cancel:${duel._id}`).setLabel('Отменить').setStyle(ButtonStyle.Secondary)
     );
 
-    const message = await interaction.editReply({ embeds: [embed], components: [row] });
+    const inviteContainer = duelContainer({
+      heading: 'Вызов открыт',
+      body: `${interaction.user} ищет соперника для дуэли, ставка **${amount.toLocaleString('ru-RU')}** ${COIN_ICON}`,
+    });
+
+    const message = await interaction.editReply({ components: [inviteContainer, row], flags: MessageFlags.IsComponentsV2 });
 
     let choice;
     try {
@@ -61,7 +86,8 @@ module.exports = {
         return;
       }
       await duelService.cancelDuel(duel._id);
-      await choice.update({ embeds: [baseEmbed({ title: 'Дуэль отменена', description: `${DIVIDER}\n${interaction.user} отменил вызов.` })], components: [] });
+      const cancelledContainer = duelContainer({ heading: 'Дуэль отменена', body: `${interaction.user} отменил вызов.`, color: config.colors.danger });
+      await choice.update({ components: [cancelledContainer], flags: MessageFlags.IsComponentsV2 });
       return;
     }
 
@@ -82,26 +108,26 @@ module.exports = {
 
     const opponent = choice.user;
 
-    const startedEmbed = baseEmbed({
-      title: 'Дуэль началась',
-      description: `${DIVIDER}\nСтавка: **${amount.toLocaleString('ru-RU')}** ${COIN_ICON}`,
-    }).addFields(
-      { name: 'Слева', value: `${interaction.user}`, inline: true },
-      { name: 'VS', value: '⚔️', inline: true },
-      { name: 'Справа', value: `${opponent}`, inline: true }
-    );
+    const startedContainer = duelContainer({
+      heading: 'Дуэль началась',
+      body: `Ставка: **${amount.toLocaleString('ru-RU')}** ${COIN_ICON}\n\n${interaction.user} ⚔️ ${opponent}`,
+    });
 
     const customDuelGifUrl = config.assets.pickRandomGif(config.assets.duelGifUrls);
     let files = [];
     if (customDuelGifUrl) {
-      startedEmbed.setImage(customDuelGifUrl);
+      startedContainer.addMediaGalleryComponents(
+        new MediaGalleryBuilder().addItems(new MediaGalleryItemBuilder().setURL(customDuelGifUrl))
+      );
     } else {
       const gifBuffer = generateDuelGif();
       const attachment = new AttachmentBuilder(gifBuffer, { name: 'duel.gif' });
-      startedEmbed.setImage('attachment://duel.gif');
+      startedContainer.addMediaGalleryComponents(
+        new MediaGalleryBuilder().addItems(new MediaGalleryItemBuilder().setURL('attachment://duel.gif'))
+      );
       files = [attachment];
     }
-    await choice.update({ embeds: [startedEmbed], components: [], files });
+    await choice.update({ components: [startedContainer], files, flags: MessageFlags.IsComponentsV2 });
 
     try {
       const { winnerId, loserId, pot } = await duelService.acceptDuel(claimedDuel._id);
@@ -110,12 +136,6 @@ module.exports = {
       const winnerUser = winnerId === interaction.user.id ? interaction.user : opponent;
       const loserUser = loserId === interaction.user.id ? interaction.user : opponent;
 
-      const winnerSide = winnerId === interaction.user.id ? 'left' : 'right';
-      const resultEmbed = baseEmbed({
-        title: 'Дуэль завершена',
-        description: `${DIVIDER}\n🏆 ${winnerUser} побеждает и забирает **${pot.toLocaleString('ru-RU')}** ${COIN_ICON}\n${loserUser} проигрывает ставку.`,
-        color: config.colors.success,
-      });
       const leftUser = winnerId === interaction.user.id
         ? { username: interaction.user.username, avatarURL: interaction.user.displayAvatarURL({ extension: 'png', size: 128 }) }
         : { username: opponent.username, avatarURL: opponent.displayAvatarURL({ extension: 'png', size: 128 }) };
@@ -123,8 +143,17 @@ module.exports = {
         ? { username: opponent.username, avatarURL: opponent.displayAvatarURL({ extension: 'png', size: 128 }) }
         : { username: interaction.user.username, avatarURL: interaction.user.displayAvatarURL({ extension: 'png', size: 128 }) };
       const resultAttachment = await buildDuelSceneCard({ leftUser, rightUser });
-      resultEmbed.setImage('attachment://duel-scene.png');
-      await interaction.followUp({ embeds: [resultEmbed], files: [resultAttachment] });
+
+      const resultContainer = duelContainer({
+        heading: 'Дуэль завершена',
+        body: `🏆 ${winnerUser} побеждает и забирает **${pot.toLocaleString('ru-RU')}** ${COIN_ICON}\n${loserUser} проигрывает ставку.`,
+        color: config.colors.success,
+      });
+      resultContainer.addMediaGalleryComponents(
+        new MediaGalleryBuilder().addItems(new MediaGalleryItemBuilder().setURL('attachment://duel-scene.png'))
+      );
+
+      await interaction.followUp({ components: [resultContainer], files: [resultAttachment], flags: MessageFlags.IsComponentsV2 });
     } catch (err) {
       if (err instanceof InsufficientFundsError) {
         await interaction.followUp({ embeds: [errorEmbed('У одного из участников не хватило монет на момент принятия. Дуэль отменена, ставки не списаны.')] });

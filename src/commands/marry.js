@@ -1,12 +1,30 @@
-const { SlashCommandBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType } = require('discord.js');
+const {
+  SlashCommandBuilder,
+  ActionRowBuilder,
+  ButtonBuilder,
+  ButtonStyle,
+  ComponentType,
+  ContainerBuilder,
+  SeparatorBuilder,
+  SeparatorSpacingSize,
+  TextDisplayBuilder,
+  MessageFlags,
+} = require('discord.js');
 const {
   relationshipService,
   AlreadyMarriedError,
-  ProposalNotFoundError,
   NotMarriedError,
 } = require('../services/RelationshipService');
-const { baseEmbed, errorEmbed, attachDivider } = require('../utils/embeds');
+const { errorEmbed } = require('../utils/embeds');
 const config = require('../config');
+
+function marryContainer({ heading, body, color = config.colors.primary }) {
+  const container = new ContainerBuilder().setAccentColor(color);
+  container.addTextDisplayComponents(new TextDisplayBuilder().setContent(`-# Отношения\n**${heading}**`));
+  container.addSeparatorComponents(new SeparatorBuilder().setDivider(true).setSpacing(SeparatorSpacingSize.Small));
+  container.addTextDisplayComponents(new TextDisplayBuilder().setContent(body));
+  return container;
+}
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -23,9 +41,10 @@ module.exports = {
       await interaction.deferReply();
       try {
         await relationshipService.divorce({ guildId: interaction.guildId, userId: interaction.user.id });
-        const embed = baseEmbed({ title: 'Развод оформлен', description: 'Вы больше не в браке.' });
-        const divider = attachDivider(embed);
-        await interaction.editReply({ embeds: [embed], files: [divider] });
+        await interaction.editReply({
+          components: [marryContainer({ heading: 'Развод оформлен', body: 'Вы больше не в браке.' })],
+          flags: MessageFlags.IsComponentsV2,
+        });
       } catch (err) {
         if (err instanceof NotMarriedError) {
           await interaction.editReply({ embeds: [errorEmbed('Вы не состоите в браке.')] });
@@ -41,15 +60,17 @@ module.exports = {
       await interaction.deferReply();
       const marriage = await relationshipService.getActiveMarriage(interaction.guildId, interaction.user.id);
       if (!marriage) {
-        const embed = baseEmbed({ title: 'Отношения', description: 'Вы не состоите в браке. Сделайте предложение через `/marry user:@кто-то`.' });
-        const divider = attachDivider(embed);
-        await interaction.editReply({ embeds: [embed], files: [divider] });
+        await interaction.editReply({
+          components: [marryContainer({ heading: 'Отношения', body: 'Вы не состоите в браке. Сделайте предложение через `/marry user:@кто-то`.' })],
+          flags: MessageFlags.IsComponentsV2,
+        });
         return;
       }
       const partnerId = marriage.userAId === interaction.user.id ? marriage.userBId : marriage.userAId;
-      const embed = baseEmbed({ title: 'Отношения', description: `В браке с <@${partnerId}> с <t:${Math.floor(new Date(marriage.marriedAt).getTime() / 1000)}:D>.` });
-      const divider = attachDivider(embed);
-      await interaction.editReply({ embeds: [embed], files: [divider] });
+      await interaction.editReply({
+        components: [marryContainer({ heading: 'Отношения', body: `В браке с <@${partnerId}> с <t:${Math.floor(new Date(marriage.marriedAt).getTime() / 1000)}:D>.` })],
+        flags: MessageFlags.IsComponentsV2,
+      });
       return;
     }
 
@@ -67,17 +88,18 @@ module.exports = {
         userAId: interaction.user.id,
         userBId: targetUser.id,
       });
-      const embed = baseEmbed({
-        title: 'Предложение руки и сердца',
-        description: `${interaction.user} делает предложение ${targetUser}!`,
-      });
-      const divider = attachDivider(embed);
+
       const row = new ActionRowBuilder().addComponents(
         new ButtonBuilder().setCustomId(`marry:accept:${proposal._id}`).setLabel('Принять').setStyle(ButtonStyle.Success),
         new ButtonBuilder().setCustomId(`marry:decline:${proposal._id}`).setLabel('Отклонить').setStyle(ButtonStyle.Danger)
       );
 
-      const message = await interaction.reply({ content: `${targetUser}`, embeds: [embed], components: [row], files: [divider], fetchReply: true });
+      const inviteContainer = marryContainer({
+        heading: 'Предложение руки и сердца',
+        body: `${interaction.user} делает предложение ${targetUser}!`,
+      });
+
+      const message = await interaction.reply({ content: `${targetUser}`, components: [inviteContainer, row], flags: MessageFlags.IsComponentsV2, fetchReply: true });
       let choice;
       try {
         choice = await message.awaitMessageComponent({
@@ -86,12 +108,20 @@ module.exports = {
           filter: (i) => i.user.id === targetUser.id,
         });
       } catch {
-        await interaction.editReply({ content: null, embeds: [baseEmbed({ title: 'Время истекло', description: 'Предложение не было принято вовремя.' })], components: [] });
+        await interaction.editReply({
+          content: null,
+          components: [marryContainer({ heading: 'Время истекло', body: 'Предложение не было принято вовремя.', color: config.colors.danger })],
+          flags: MessageFlags.IsComponentsV2,
+        });
         return;
       }
 
       if (choice.customId.startsWith('marry:decline')) {
-        await choice.update({ content: null, embeds: [baseEmbed({ title: 'Отклонено', description: `${targetUser} отклонил(а) предложение.` })], components: [] });
+        await choice.update({
+          content: null,
+          components: [marryContainer({ heading: 'Отклонено', body: `${targetUser} отклонил(а) предложение.`, color: config.colors.danger })],
+          flags: MessageFlags.IsComponentsV2,
+        });
         return;
       }
 
@@ -99,8 +129,8 @@ module.exports = {
         await relationshipService.accept({ relationshipId: proposal._id, userId: targetUser.id });
         await choice.update({
           content: null,
-          embeds: [baseEmbed({ title: 'Поздравляем!', description: `${interaction.user} и ${targetUser} теперь в браке. 💍`, color: config.colors.success })],
-          components: [],
+          components: [marryContainer({ heading: 'Поздравляем!', body: `${interaction.user} и ${targetUser} теперь в браке. 💍`, color: config.colors.success })],
+          flags: MessageFlags.IsComponentsV2,
         });
       } catch (err) {
         if (err instanceof AlreadyMarriedError) {

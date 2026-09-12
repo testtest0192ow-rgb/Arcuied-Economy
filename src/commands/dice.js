@@ -1,13 +1,36 @@
-const { SlashCommandBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType } = require('discord.js');
+const {
+  SlashCommandBuilder,
+  ActionRowBuilder,
+  ButtonBuilder,
+  ButtonStyle,
+  ComponentType,
+  ContainerBuilder,
+  SeparatorBuilder,
+  SeparatorSpacingSize,
+  TextDisplayBuilder,
+  MediaGalleryBuilder,
+  MediaGalleryItemBuilder,
+  MessageFlags,
+} = require('discord.js');
 const { duelService, DuelNotPendingError, DuelAlreadyTakenError } = require('../services/DuelService');
 const { transactionService, InsufficientFundsError } = require('../services/TransactionService');
 const { questService } = require('../services/QuestService');
 const { buildDiceDuelCard } = require('../services/DiceDuelCardService');
-const { baseEmbed, errorEmbed, DIVIDER, COIN_ICON } = require('../utils/embeds');
+const { errorEmbed, COIN_ICON } = require('../utils/embeds');
 const config = require('../config');
 
 const DICE_FACES = { 1: '⚀', 2: '⚁', 3: '⚂', 4: '⚃', 5: '⚄', 6: '⚅' };
 const formatRoll = (values) => values.map((v) => DICE_FACES[v] || v).join(' ');
+
+// Один общий билдер Components V2 для всех сообщений этой команды — маленькая
+// серая подпись-категория ("-# Кости") + жирный заголовок + Separator + текст.
+function diceContainer({ heading, body, color = config.colors.primary }) {
+  const container = new ContainerBuilder().setAccentColor(color);
+  container.addTextDisplayComponents(new TextDisplayBuilder().setContent(`-# Кости\n**${heading}**`));
+  container.addSeparatorComponents(new SeparatorBuilder().setDivider(true).setSpacing(SeparatorSpacingSize.Small));
+  container.addTextDisplayComponents(new TextDisplayBuilder().setContent(body));
+  return container;
+}
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -32,16 +55,17 @@ module.exports = {
       mode: 'dice',
     });
 
-    const embed = baseEmbed({
-      title: 'Кости',
-      description: `${DIVIDER}\n${interaction.user} предлагает сыграть в кости, ставка **${amount.toLocaleString('ru-RU')}** ${COIN_ICON}`,
-    });
     const row = new ActionRowBuilder().addComponents(
       new ButtonBuilder().setCustomId(`dice:accept:${duel._id}`).setLabel('Принять').setStyle(ButtonStyle.Success),
       new ButtonBuilder().setCustomId(`dice:cancel:${duel._id}`).setLabel('Отменить').setStyle(ButtonStyle.Secondary)
     );
 
-    const message = await interaction.editReply({ embeds: [embed], components: [row] });
+    const inviteContainer = diceContainer({
+      heading: 'Приглашение сыграть',
+      body: `${interaction.user} предлагает сыграть в кости, ставка **${amount.toLocaleString('ru-RU')}** ${COIN_ICON}`,
+    });
+
+    const message = await interaction.editReply({ components: [inviteContainer, row], flags: MessageFlags.IsComponentsV2 });
 
     let choice;
     try {
@@ -60,7 +84,8 @@ module.exports = {
         return;
       }
       await duelService.cancelDuel(duel._id);
-      await choice.update({ embeds: [baseEmbed({ title: 'Игра отменена', description: `${DIVIDER}\n${interaction.user} отменил предложение.` })], components: [] });
+      const cancelledContainer = diceContainer({ heading: 'Игра отменена', body: `${interaction.user} отменил предложение.`, color: config.colors.danger });
+      await choice.update({ components: [cancelledContainer], flags: MessageFlags.IsComponentsV2 });
       return;
     }
 
@@ -79,22 +104,14 @@ module.exports = {
     }
 
     const opponent = choice.user;
-    await choice.update({
-      embeds: [baseEmbed({ title: 'Кости брошены...', description: `${DIVIDER}\n${interaction.user} vs ${opponent}` })],
-      components: [],
-    });
+    const rollingContainer = diceContainer({ heading: 'Кости брошены...', body: `${interaction.user} vs ${opponent}` });
+    await choice.update({ components: [rollingContainer], flags: MessageFlags.IsComponentsV2 });
 
     try {
       const { winnerId, pot, rolls } = await duelService.acceptDuel(claimedDuel._id);
       await questService.increment(interaction.guild, interaction.user.id, 'activity', 1).catch(() => {});
       await questService.increment(interaction.guild, opponent.id, 'activity', 1).catch(() => {});
       const winnerUser = winnerId === interaction.user.id ? interaction.user : opponent;
-
-      const resultEmbed = baseEmbed({
-        title: `Победа ${winnerUser.username}`,
-        description: `${DIVIDER}\n🏆 ${winnerUser} забирает **${pot.toLocaleString('ru-RU')}** ${COIN_ICON}`,
-        color: config.colors.success,
-      });
 
       const cardAttachment = await buildDiceDuelCard({
         leftUser: { username: interaction.user.username, avatarURL: interaction.user.displayAvatarURL({ extension: 'png', size: 128 }) },
@@ -104,9 +121,17 @@ module.exports = {
         leftSum: rolls.challengerSum,
         rightSum: rolls.opponentSum,
       });
-      resultEmbed.setImage('attachment://dice-duel.png');
 
-      await interaction.followUp({ embeds: [resultEmbed], files: [cardAttachment] });
+      const resultContainer = diceContainer({
+        heading: `Победа ${winnerUser.username}`,
+        body: `🏆 ${winnerUser} забирает **${pot.toLocaleString('ru-RU')}** ${COIN_ICON}`,
+        color: config.colors.success,
+      });
+      resultContainer.addMediaGalleryComponents(
+        new MediaGalleryBuilder().addItems(new MediaGalleryItemBuilder().setURL('attachment://dice-duel.png'))
+      );
+
+      await interaction.followUp({ components: [resultContainer], files: [cardAttachment], flags: MessageFlags.IsComponentsV2 });
     } catch (err) {
       if (err instanceof InsufficientFundsError) {
         await interaction.followUp({ embeds: [errorEmbed('У одного из участников не хватило монет на момент принятия. Игра отменена, ставки не списаны.')] });

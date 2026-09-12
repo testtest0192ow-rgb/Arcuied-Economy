@@ -1,7 +1,18 @@
-const { SlashCommandBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType } = require('discord.js');
+const {
+  SlashCommandBuilder,
+  ActionRowBuilder,
+  ButtonBuilder,
+  ButtonStyle,
+  ComponentType,
+  ContainerBuilder,
+  SeparatorBuilder,
+  SeparatorSpacingSize,
+  TextDisplayBuilder,
+  MessageFlags,
+} = require('discord.js');
 const crypto = require('crypto');
 const { mogBattleService } = require('../services/MogBattleService');
-const { baseEmbed, errorEmbed, DIVIDER } = require('../utils/embeds');
+const { errorEmbed } = require('../utils/embeds');
 const config = require('../config');
 
 function fmtLine(b) {
@@ -10,6 +21,14 @@ function fmtLine(b) {
 
 const COMMENTS_CLOSE = ['Разница минимальная — это была настоящая борьба.', 'Победа буквально на волоске.'];
 const COMMENTS_CLEAR = ['Уверенная победа по всем статьям.', 'Явное превосходство — тут и спорить не о чем.'];
+
+function battleContainer({ heading, body, color = config.colors.primary }) {
+  const container = new ContainerBuilder().setAccentColor(color);
+  container.addTextDisplayComponents(new TextDisplayBuilder().setContent(`-# Mog Battle\n**${heading}**`));
+  container.addSeparatorComponents(new SeparatorBuilder().setDivider(true).setSpacing(SeparatorSpacingSize.Small));
+  container.addTextDisplayComponents(new TextDisplayBuilder().setContent(body));
+  return container;
+}
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -35,17 +54,18 @@ module.exports = {
       opponentId: targetUser.id,
     });
 
-    const inviteEmbed = baseEmbed({
-      title: 'Вызов на сравнение профилей',
-      description: `${DIVIDER}\n${interaction.user} вызывает ${targetUser} на Mog Battle!`,
-    });
     const row = new ActionRowBuilder().addComponents(
       new ButtonBuilder().setCustomId(`battle:accept:${battle._id}`).setLabel('Принять').setStyle(ButtonStyle.Success),
       new ButtonBuilder().setCustomId(`battle:decline:${battle._id}`).setLabel('Отклонить').setStyle(ButtonStyle.Danger),
       new ButtonBuilder().setCustomId(`battle:cancel:${battle._id}`).setLabel('Отменить').setStyle(ButtonStyle.Secondary)
     );
 
-    const message = await interaction.reply({ content: `${targetUser}`, embeds: [inviteEmbed], components: [row], fetchReply: true });
+    const inviteContainer = battleContainer({
+      heading: 'Вызов на сравнение профилей',
+      body: `${interaction.user} вызывает ${targetUser} на Mog Battle!`,
+    });
+
+    const message = await interaction.reply({ content: `${targetUser}`, components: [inviteContainer, row], flags: MessageFlags.IsComponentsV2, fetchReply: true });
     await mogBattleService.attachMessage(battle._id, { messageId: message.id, channelId: message.channelId });
 
     let choice;
@@ -57,19 +77,31 @@ module.exports = {
       });
     } catch {
       await mogBattleService.expire(battle._id);
-      await interaction.editReply({ content: null, embeds: [baseEmbed({ title: 'Время истекло', description: `${DIVIDER}\nВызов не был принят вовремя.` })], components: [] });
+      await interaction.editReply({
+        content: null,
+        components: [battleContainer({ heading: 'Время истекло', body: 'Вызов не был принят вовремя.', color: config.colors.danger })],
+        flags: MessageFlags.IsComponentsV2,
+      });
       return;
     }
 
     if (choice.customId.includes(':cancel:')) {
       await mogBattleService.cancelOwnPending({ guildId: interaction.guildId, challengerId: interaction.user.id });
-      await choice.update({ content: null, embeds: [baseEmbed({ title: 'Отменено', description: `${DIVIDER}\nВызов отменён.` })], components: [] });
+      await choice.update({
+        content: null,
+        components: [battleContainer({ heading: 'Отменено', body: 'Вызов отменён.', color: config.colors.danger })],
+        flags: MessageFlags.IsComponentsV2,
+      });
       return;
     }
 
     if (choice.customId.includes(':decline:')) {
       await mogBattleService.decline(battle._id);
-      await choice.update({ content: null, embeds: [baseEmbed({ title: 'Отклонено', description: `${DIVIDER}\n${targetUser} отклонил(а) вызов.` })], components: [] });
+      await choice.update({
+        content: null,
+        components: [battleContainer({ heading: 'Отклонено', body: `${targetUser} отклонил(а) вызов.`, color: config.colors.danger })],
+        flags: MessageFlags.IsComponentsV2,
+      });
       return;
     }
 
@@ -102,19 +134,17 @@ module.exports = {
         loserId: loserUser.id,
       });
 
-      const resultEmbed = baseEmbed({
-        title: 'Результат Mog Battle',
-        description:
-          `${DIVIDER}\n` +
-          `**${interaction.user.username}** — ${scoreA.total.toFixed(1)} очков\n` +
-          scoreA.breakdown.map(fmtLine).join('\n') +
-          `\n\n**${targetUser.username}** — ${scoreB.total.toFixed(1)} очков\n` +
-          scoreB.breakdown.map(fmtLine).join('\n') +
-          `\n\n🏆 Побеждает ${winnerUser} — ${winnerScore.toFixed(1)} : ${loserScore.toFixed(1)}\n-# ${comment}`,
-        color: config.colors.success,
-      });
+      const resultBody =
+        `**${interaction.user.username}** — ${scoreA.total.toFixed(1)} очков\n` +
+        scoreA.breakdown.map(fmtLine).join('\n') +
+        `\n\n**${targetUser.username}** — ${scoreB.total.toFixed(1)} очков\n` +
+        scoreB.breakdown.map(fmtLine).join('\n') +
+        `\n\n🏆 Побеждает ${winnerUser} — ${winnerScore.toFixed(1)} : ${loserScore.toFixed(1)}\n-# ${comment}`;
 
-      await interaction.editReply({ embeds: [resultEmbed], components: [] });
+      await interaction.editReply({
+        components: [battleContainer({ heading: 'Результат Mog Battle', body: resultBody, color: config.colors.success })],
+        flags: MessageFlags.IsComponentsV2,
+      });
     } catch (err) {
       interaction.client.logger?.error?.('[/battle]', err);
       await interaction.editReply({ embeds: [errorEmbed()], components: [] });

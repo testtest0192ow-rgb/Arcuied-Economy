@@ -4,6 +4,11 @@ const {
   ButtonBuilder,
   ButtonStyle,
   ComponentType,
+  ContainerBuilder,
+  SeparatorBuilder,
+  SeparatorSpacingSize,
+  TextDisplayBuilder,
+  MessageFlags,
 } = require('discord.js');
 const {
   itemService,
@@ -11,11 +16,19 @@ const {
   NotEnoughItemsError,
 } = require('../services/ItemService');
 const { DuplicateActionError } = require('../services/TransactionService');
-const { baseEmbed, errorEmbed, DIVIDER, COIN_ICON, DONATE_ICON } = require('../utils/embeds');
+const { errorEmbed, COIN_ICON, DONATE_ICON } = require('../utils/embeds');
 const config = require('../config');
 
 function icon(currency) {
   return currency === 'donateCoins' ? DONATE_ICON : COIN_ICON;
+}
+
+function sellContainer({ heading, body, color = config.colors.primary }) {
+  const container = new ContainerBuilder().setAccentColor(color);
+  container.addTextDisplayComponents(new TextDisplayBuilder().setContent(`-# Продажа\n**${heading}**`));
+  container.addSeparatorComponents(new SeparatorBuilder().setDivider(true).setSpacing(SeparatorSpacingSize.Small));
+  container.addTextDisplayComponents(new TextDisplayBuilder().setContent(body));
+  return container;
 }
 
 module.exports = {
@@ -51,15 +64,15 @@ module.exports = {
     }
 
     const refund = Math.floor(item.price * item.sellRatio * quantity);
-    const confirmEmbed = baseEmbed({
-      title: 'Продажа',
-      description: `**${item.name}** × ${quantity}\nВы получите: **${refund.toLocaleString('ru-RU')}** ${icon(item.currency)}`,
-    });
     const row = new ActionRowBuilder().addComponents(
       new ButtonBuilder().setCustomId('sell:confirm').setLabel('Продать').setStyle(ButtonStyle.Success),
       new ButtonBuilder().setCustomId('sell:cancel').setLabel('Отмена').setStyle(ButtonStyle.Secondary)
     );
-    const message = await interaction.editReply({ embeds: [confirmEmbed], components: [row] });
+    const confirmContainer = sellContainer({
+      heading: 'Подтвердите продажу',
+      body: `**${item.name}** × ${quantity}\nВы получите: **${refund.toLocaleString('ru-RU')}** ${icon(item.currency)}`,
+    });
+    const message = await interaction.editReply({ components: [confirmContainer, row], flags: MessageFlags.IsComponentsV2 });
 
     let choice;
     try {
@@ -74,11 +87,10 @@ module.exports = {
     }
 
     if (choice.customId === 'sell:cancel') {
-      await choice.update({ embeds: [baseEmbed({ title: 'Отменено', description: `Продажа не выполнена.` })], components: [] });
+      const cancelledContainer = sellContainer({ heading: 'Отменено', body: 'Продажа не выполнена.', color: config.colors.danger });
+      await choice.update({ components: [cancelledContainer], flags: MessageFlags.IsComponentsV2 });
       return;
     }
-
-    await choice.update({ components: [] });
 
     try {
       const idempotencyKey = `sell:${interaction.id}`;
@@ -90,29 +102,29 @@ module.exports = {
         idempotencyKey,
       });
 
-      const embed = baseEmbed({
-        title: 'Продано',
-        description:
+      const doneContainer = sellContainer({
+        heading: 'Продано',
+        body:
           `**${item.name}** × ${quantity}\nПолучено: **${refund.toLocaleString('ru-RU')}** ${icon(item.currency)}\n\n` +
           `Баланс: **${wallet[item.currency].toLocaleString('ru-RU')}** ${icon(item.currency)}`,
         color: config.colors.success,
       });
-      await interaction.editReply({ embeds: [embed], components: [] });
+      await choice.update({ components: [doneContainer], flags: MessageFlags.IsComponentsV2 });
     } catch (err) {
       if (err instanceof NotEnoughItemsError) {
-        await interaction.editReply({ embeds: [errorEmbed('У вас недостаточно этого предмета.')], components: [] });
+        await choice.update({ embeds: [errorEmbed('У вас недостаточно этого предмета.')], components: [] });
         return;
       }
       if (err instanceof ItemNotSellableError) {
-        await interaction.editReply({ embeds: [errorEmbed('Этот предмет нельзя продать.')], components: [] });
+        await choice.update({ embeds: [errorEmbed('Этот предмет нельзя продать.')], components: [] });
         return;
       }
       if (err instanceof DuplicateActionError) {
-        await interaction.editReply({ embeds: [errorEmbed('Эта продажа уже была выполнена.')], components: [] });
+        await choice.update({ embeds: [errorEmbed('Эта продажа уже была выполнена.')], components: [] });
         return;
       }
       interaction.client.logger?.error?.('[/sell]', err);
-      await interaction.editReply({ embeds: [errorEmbed()], components: [] });
+      await choice.update({ embeds: [errorEmbed()], components: [] });
     }
   },
 };

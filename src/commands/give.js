@@ -4,11 +4,24 @@ const {
   ButtonBuilder,
   ButtonStyle,
   ComponentType,
+  ContainerBuilder,
+  SeparatorBuilder,
+  SeparatorSpacingSize,
+  TextDisplayBuilder,
+  MessageFlags,
 } = require('discord.js');
 const { transactionService, InsufficientFundsError, DuplicateActionError } = require('../services/TransactionService');
 const { questService } = require('../services/QuestService');
-const { baseEmbed, errorEmbed, DIVIDER, COIN_ICON } = require('../utils/embeds');
+const { errorEmbed, COIN_ICON } = require('../utils/embeds');
 const config = require('../config');
+
+function giveContainer({ heading, body, color = config.colors.primary }) {
+  const container = new ContainerBuilder().setAccentColor(color);
+  container.addTextDisplayComponents(new TextDisplayBuilder().setContent(`-# Передача монет\n**${heading}**`));
+  container.addSeparatorComponents(new SeparatorBuilder().setDivider(true).setSpacing(SeparatorSpacingSize.Small));
+  container.addTextDisplayComponents(new TextDisplayBuilder().setContent(body));
+  return container;
+}
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -44,10 +57,9 @@ module.exports = {
 
     const fee = Math.floor((amount * config.giveFeePercent) / 100);
     const willArrive = amount - fee;
-    const confirmEmbed = baseEmbed({
-      title: 'Подтвердите передачу',
-      description:
-        `${DIVIDER}\n` +
+    const confirmContainer = giveContainer({
+      heading: 'Подтвердите передачу',
+      body:
         `Отправить **${amount.toLocaleString('ru-RU')}** ${COIN_ICON} пользователю ${targetUser}?\n` +
         `-# Комиссия ${config.giveFeePercent}%: **${fee.toLocaleString('ru-RU')}** ${COIN_ICON} · получит **${willArrive.toLocaleString('ru-RU')}** ${COIN_ICON}`,
     });
@@ -57,7 +69,7 @@ module.exports = {
       new ButtonBuilder().setCustomId('give:cancel').setLabel('Отмена').setStyle(ButtonStyle.Secondary)
     );
 
-    const message = await interaction.editReply({ embeds: [confirmEmbed], components: [row] });
+    const message = await interaction.editReply({ components: [confirmContainer, row], flags: MessageFlags.IsComponentsV2 });
 
     let choice;
     try {
@@ -72,12 +84,10 @@ module.exports = {
     }
 
     if (choice.customId === 'give:cancel') {
-      await choice.update({ embeds: [baseEmbed({ title: 'Отменено', description: `${DIVIDER}\nПередача не выполнена.` })], components: [] });
+      const cancelledContainer = giveContainer({ heading: 'Отменено', body: 'Передача не выполнена.', color: config.colors.danger });
+      await choice.update({ components: [cancelledContainer], flags: MessageFlags.IsComponentsV2 });
       return;
     }
-
-    // Disable buttons immediately so a second click on "Подтвердить" can't fire a second transfer.
-    await choice.update({ components: [] });
 
     try {
       const idempotencyKey = `give:${interaction.id}`;
@@ -91,40 +101,34 @@ module.exports = {
 
       await questService.increment(interaction.guild, interaction.user.id, 'give', 1).catch(() => {});
 
-      const successEmbed = baseEmbed({
-        title: 'Монеты переданы',
-        description:
-          `${DIVIDER}\n` +
+      const successContainer = giveContainer({
+        heading: 'Монеты переданы',
+        body:
           `Получатель: ${targetUser}\n` +
           `Сумма: **${amount.toLocaleString('ru-RU')}** ${COIN_ICON}\n` +
           `Комиссия: **${appliedFee.toLocaleString('ru-RU')}** ${COIN_ICON} · получено: **${amountAfterFee.toLocaleString('ru-RU')}** ${COIN_ICON}\n\n` +
           `Ваш баланс: **${from.coins.toLocaleString('ru-RU')}** ${COIN_ICON}`,
         color: config.colors.success,
       });
-      await interaction.editReply({ embeds: [successEmbed], components: [] });
+      await choice.update({ components: [successContainer], flags: MessageFlags.IsComponentsV2 });
 
-      targetUser
-        .send({
-          embeds: [
-            baseEmbed({
-              title: 'Вам передали монеты',
-              description: `${DIVIDER}\nОт: ${interaction.user}\nСумма: **${amountAfterFee.toLocaleString('ru-RU')}** ${COIN_ICON} (после комиссии ${config.giveFeePercent}%)`,
-              color: config.colors.success,
-            }),
-          ],
-        })
-        .catch(() => {}); // Recipient may have DMs closed — not a failure of the transfer itself.
+      const dmContainer = giveContainer({
+        heading: 'Вам передали монеты',
+        body: `От: ${interaction.user}\nСумма: **${amountAfterFee.toLocaleString('ru-RU')}** ${COIN_ICON} (после комиссии ${config.giveFeePercent}%)`,
+        color: config.colors.success,
+      });
+      targetUser.send({ components: [dmContainer], flags: MessageFlags.IsComponentsV2 }).catch(() => {}); // ЛС могут быть закрыты — не ошибка самого перевода.
     } catch (err) {
       if (err instanceof InsufficientFundsError) {
-        await interaction.editReply({ embeds: [errorEmbed('Недостаточно монет на момент подтверждения.')], components: [] });
+        await choice.update({ embeds: [errorEmbed('Недостаточно монет на момент подтверждения.')], components: [] });
         return;
       }
       if (err instanceof DuplicateActionError) {
-        await interaction.editReply({ embeds: [errorEmbed('Эта передача уже была выполнена.')], components: [] });
+        await choice.update({ embeds: [errorEmbed('Эта передача уже была выполнена.')], components: [] });
         return;
       }
       interaction.client.logger?.error?.('[/give]', err);
-      await interaction.editReply({ embeds: [errorEmbed()], components: [] });
+      await choice.update({ embeds: [errorEmbed()], components: [] });
     }
   },
 };

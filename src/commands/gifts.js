@@ -1,8 +1,19 @@
-const { SlashCommandBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType } = require('discord.js');
+const {
+  SlashCommandBuilder,
+  ActionRowBuilder,
+  ButtonBuilder,
+  ButtonStyle,
+  ComponentType,
+  ContainerBuilder,
+  SeparatorBuilder,
+  SeparatorSpacingSize,
+  TextDisplayBuilder,
+  MessageFlags,
+} = require('discord.js');
 const { giftService, GiftNotFoundError, GiftAlreadyClaimedError } = require('../services/GiftService');
 const { guessGiftService, RoundNotOpenError, AlreadyGuessedError, CannotGuessOwnGiftError } = require('../services/GuessGiftService');
 const { InsufficientFundsError, DuplicateActionError } = require('../services/TransactionService');
-const { baseEmbed, errorEmbed, DIVIDER, COIN_ICON, DONATE_ICON } = require('../utils/embeds');
+const { errorEmbed, COIN_ICON, DONATE_ICON } = require('../utils/embeds');
 const config = require('../config');
 
 const emojiIds = require('../generated/emojiIds.json');
@@ -13,6 +24,15 @@ const GUESS_ROUND_MINUTES = 10;
 
 function icon(currency) {
   return currency === 'donateCoins' ? DONATE_ICON : COIN_ICON;
+}
+
+// Общий паттерн Components V2 для всех сообщений этой команды.
+function giftsContainer({ heading, body, color = config.colors.primary }) {
+  const container = new ContainerBuilder().setAccentColor(color);
+  container.addTextDisplayComponents(new TextDisplayBuilder().setContent(`-# Подарки\n**${heading}**`));
+  container.addSeparatorComponents(new SeparatorBuilder().setDivider(true).setSpacing(SeparatorSpacingSize.Small));
+  container.addTextDisplayComponents(new TextDisplayBuilder().setContent(body));
+  return container;
 }
 
 async function handleSend(interaction) {
@@ -35,17 +55,19 @@ async function handleSend(interaction) {
     });
 
     await interaction.editReply({
-      embeds: [
-        baseEmbed({
-          title: 'Подарок отправлен',
-          description: `${targetUser} получит **${amount.toLocaleString('ru-RU')}** ${COIN_ICON} после того, как откроет подарок (\`/gifts list\`).`,
-          color: config.colors.success,
-        }),
-      ],
+      components: [giftsContainer({
+        heading: 'Подарок отправлен',
+        body: `${targetUser} получит **${amount.toLocaleString('ru-RU')}** ${COIN_ICON} после того, как откроет подарок (\`/gifts list\`).`,
+        color: config.colors.success,
+      })],
+      flags: MessageFlags.IsComponentsV2,
     });
 
     targetUser
-      .send({ embeds: [baseEmbed({ title: 'Вам подарок', description: `От: ${interaction.user}\nОткройте его командой \`/gifts list\`.` })] })
+      .send({
+        components: [giftsContainer({ heading: 'Вам подарок', body: `От: ${interaction.user}\nОткройте его командой \`/gifts list\`.` })],
+        flags: MessageFlags.IsComponentsV2,
+      })
       .catch(() => {});
   } catch (err) {
     if (err instanceof InsufficientFundsError) {
@@ -65,7 +87,10 @@ async function handleList(interaction) {
   try {
     const pending = await giftService.listPending(interaction.guildId, interaction.user.id);
     if (pending.length === 0) {
-      await interaction.editReply({ embeds: [baseEmbed({ title: 'Подарки', description: `Непринятых подарков нет.` })] });
+      await interaction.editReply({
+        components: [giftsContainer({ heading: 'Подарки', body: 'Непринятых подарков нет.' })],
+        flags: MessageFlags.IsComponentsV2,
+      });
       return;
     }
 
@@ -83,8 +108,8 @@ async function handleList(interaction) {
       );
 
     await interaction.editReply({
-      embeds: [baseEmbed({ title: 'Непринятые подарки', description: `${lines.join('\n')}` })],
-      components: rows,
+      components: [giftsContainer({ heading: 'Непринятые подарки', body: lines.join('\n') }), ...rows],
+      flags: MessageFlags.IsComponentsV2,
     });
   } catch (err) {
     interaction.client.logger?.error?.('[/gifts list]', err);
@@ -92,10 +117,11 @@ async function handleList(interaction) {
   }
 }
 
-function guessGiftRoundEmbed(hiderUser, amount, statusText) {
-  return baseEmbed({
-    title: 'Угадай подарок',
-    description: `${hiderUser} спрятал **${amount.toLocaleString('ru-RU')}** ${COIN_ICON} в одном из подарков!\n\n${statusText}`,
+function guessGiftRoundContainer(hiderUser, amount, statusText, color = config.colors.primary) {
+  return giftsContainer({
+    heading: 'Угадай подарок',
+    body: `${hiderUser} спрятал **${amount.toLocaleString('ru-RU')}** ${COIN_ICON} в одном из подарков!\n\n${statusText}`,
+    color,
   });
 }
 
@@ -124,12 +150,17 @@ async function handleHide(interaction) {
     const round = await guessGiftService.hide({ guildId: interaction.guildId, hiderId: interaction.user.id, amount });
 
     await interaction.editReply({
-      embeds: [baseEmbed({ title: 'Спрятано', description: `Вы спрятали **${amount.toLocaleString('ru-RU')}** ${COIN_ICON} в одном из 3 подарков. Публикую в чат — первый, кто угадает, заберёт их.`, color: config.colors.success })],
+      components: [giftsContainer({
+        heading: 'Спрятано',
+        body: `Вы спрятали **${amount.toLocaleString('ru-RU')}** ${COIN_ICON} в одном из 3 подарков. Публикую в чат — первый, кто угадает, заберёт их.`,
+        color: config.colors.success,
+      })],
+      flags: MessageFlags.IsComponentsV2,
     });
 
     const publicMessage = await interaction.channel.send({
-      embeds: [guessGiftRoundEmbed(interaction.user, amount, '-# У каждого — только одна попытка.')],
-      components: [guessGiftButtons(round._id)],
+      components: [guessGiftRoundContainer(interaction.user, amount, '-# У каждого — только одна попытка.'), guessGiftButtons(round._id)],
+      flags: MessageFlags.IsComponentsV2,
     });
 
     const collector = publicMessage.createMessageComponentCollector({
@@ -142,7 +173,7 @@ async function handleHide(interaction) {
       const box = Number(boxStr);
 
       try {
-        const { won, gift } = await guessGiftService.guess({
+        const { won } = await guessGiftService.guess({
           guildId: interaction.guildId,
           roundId,
           userId: buttonInteraction.user.id,
@@ -152,13 +183,16 @@ async function handleHide(interaction) {
         if (won) {
           collector.stop('won');
           await buttonInteraction.update({
-            embeds: [guessGiftRoundEmbed(interaction.user, amount, `🏆 ${buttonInteraction.user} угадал и забрал подарок!`)],
-            components: [guessGiftButtons(roundId, true)],
+            components: [
+              guessGiftRoundContainer(interaction.user, amount, `🏆 ${buttonInteraction.user} угадал и забрал подарок!`, config.colors.success),
+              guessGiftButtons(roundId, true),
+            ],
+            flags: MessageFlags.IsComponentsV2,
           });
           return;
         }
 
-        await buttonInteraction.reply({ embeds: [errorEmbed(`Мимо! В этом подарке ничего не было (попытка потрачена).`)], ephemeral: true });
+        await buttonInteraction.reply({ embeds: [errorEmbed('Мимо! В этом подарке ничего не было (попытка потрачена).')], ephemeral: true });
       } catch (err) {
         if (err instanceof CannotGuessOwnGiftError) {
           await buttonInteraction.reply({ embeds: [errorEmbed('Нельзя угадывать свой же подарок.')], ephemeral: true });
@@ -182,8 +216,11 @@ async function handleHide(interaction) {
       try {
         await guessGiftService.expire({ guildId: interaction.guildId, roundId: round._id });
         await publicMessage.edit({
-          embeds: [guessGiftRoundEmbed(interaction.user, amount, 'Никто не угадал — подарок вернулся отправителю.')],
-          components: [guessGiftButtons(round._id, true)],
+          components: [
+            guessGiftRoundContainer(interaction.user, amount, 'Никто не угадал — подарок вернулся отправителю.', config.colors.warning),
+            guessGiftButtons(round._id, true),
+          ],
+          flags: MessageFlags.IsComponentsV2,
         });
       } catch (err) {
         interaction.client.logger?.error?.('[/gifts hide expire]', err);
@@ -227,22 +264,23 @@ module.exports = {
     return handleList(interaction);
   },
 
-  // Only for /gifts list -> "Открыть подарок" buttons (customId "gifts:open:<id>").
-  // The guess-game buttons use a separate "giftguess:" namespace handled by their own
-  // message collector in handleHide(), so they never reach this router.
+  // Только для кнопок "Открыть подарок" из /gifts list (customId "gifts:open:<id>").
+  // Кнопки угадай-игры живут в своём неймспейсе "giftguess:" и обрабатываются
+  // отдельным коллектором внутри handleHide(), сюда они не попадают.
   async handleButton(interaction) {
     const giftId = interaction.customId.split(':')[2];
     await interaction.deferUpdate();
 
     try {
       const { gift } = await giftService.claimGift({ giftId, userId: interaction.user.id });
-      const description =
+      const body =
         gift.kind === 'coins'
           ? `Вы получили **${gift.amount.toLocaleString('ru-RU')}** ${icon(gift.currency)}.`
           : `Вы получили **${gift.itemKey}** × ${gift.quantity}.`;
 
       await interaction.followUp({
-        embeds: [baseEmbed({ title: 'Подарок открыт', description: `${description}`, color: config.colors.success })],
+        components: [giftsContainer({ heading: 'Подарок открыт', body, color: config.colors.success })],
+        flags: MessageFlags.IsComponentsV2,
         ephemeral: true,
       });
     } catch (err) {

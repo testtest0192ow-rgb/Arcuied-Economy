@@ -1,6 +1,21 @@
-const { SlashCommandBuilder, StringSelectMenuBuilder, StringSelectMenuOptionBuilder, ActionRowBuilder, ComponentType } = require('discord.js');
-const { itemService } = require('../services/ItemService');
-const { baseEmbed, errorEmbed, DIVIDER, COIN_ICON, DONATE_ICON } = require('../utils/embeds');
+const {
+  SlashCommandBuilder,
+  StringSelectMenuBuilder,
+  StringSelectMenuOptionBuilder,
+  ActionRowBuilder,
+  ButtonBuilder,
+  ButtonStyle,
+  ContainerBuilder,
+  SeparatorBuilder,
+  SeparatorSpacingSize,
+  TextDisplayBuilder,
+  MessageFlags,
+} = require('discord.js');
+const { itemService, ItemNotFoundError } = require('../services/ItemService');
+const { transactionService, InsufficientFundsError, DuplicateActionError } = require('../services/TransactionService');
+const { roleAutomationService } = require('../services/RoleAutomationService');
+const Item = require('../models/Item');
+const { errorEmbed, COIN_ICON, DONATE_ICON } = require('../utils/embeds');
 const config = require('../config');
 
 const CATEGORY_LABELS = {
@@ -27,6 +42,10 @@ const SORT_COMPARATORS = {
   new: (a, b) => new Date(b.createdAt) - new Date(a.createdAt),
 };
 
+// Discord позволяет максимум 5 кнопок в ряду — быстрая покупка доступна только
+// для первых MAX_QUICK_BUY товаров текущей страницы, остальные — через /buy item:.
+const MAX_QUICK_BUY = 5;
+
 function icon(currency) {
   return currency === 'donateCoins' ? DONATE_ICON : COIN_ICON;
 }
@@ -37,19 +56,100 @@ function sortItems(items, sort) {
 
 function renderCategory(items, category, sort) {
   const sortLabel = SORT_OPTIONS.find((o) => o.value === sort)?.label || '';
+  const heading = CATEGORY_LABELS[category] || category;
+  const container = new ContainerBuilder().setAccentColor(config.colors.primary);
+  container.addTextDisplayComponents(new TextDisplayBuilder().setContent(`-# Магазин\n**${heading}**`));
+  container.addSeparatorComponents(new SeparatorBuilder().setDivider(true).setSpacing(SeparatorSpacingSize.Small));
+
   if (items.length === 0) {
-    return baseEmbed({
-      title: CATEGORY_LABELS[category] || category,
-      description: `В этой категории пока пусто.`,
-    });
+    container.addTextDisplayComponents(new TextDisplayBuilder().setContent('В этой категории пока пусто.'));
+    return container;
   }
-  const lines = sortItems(items, sort).map(
-    (i) => `**${i.name}**\n${i.description || '-# без описания'}\nЦена: **${i.price.toLocaleString('ru-RU')}** ${icon(i.currency)} · \`/buy item:${i.key}\``
+
+  const sorted = sortItems(items, sort);
+  const lines = sorted.map(
+    (i) => `🛒 **${i.name}**\n${i.description || '-# без описания'}\nЦена: **${i.price.toLocaleString('ru-RU')}** ${icon(i.currency)} · \`/buy item:${i.key}\``
   );
-  return baseEmbed({
-    title: CATEGORY_LABELS[category] || category,
-    description: `${lines.join('\n\n')}\n\n-# ${sortLabel}`,
-  });
+  container.addTextDisplayComponents(new TextDisplayBuilder().setContent(`${lines.join('\n\n')}\n\n-# ${sortLabel}`));
+  return container;
+}
+
+function buildBuyButtonsRow(items, sort) {
+  const sorted = sortItems(items, sort).slice(0, MAX_QUICK_BUY);
+  if (sorted.length === 0) return null;
+  const row = new ActionRowBuilder();
+  for (const item of sorted) {
+    row.addComponents(
+      new ButtonBuilder()
+        .setCustomId(`shop:buy:${item.key}`)
+        .setLabel(`Купить: ${item.name}`.slice(0, 80))
+        .setEmoji('🛒')
+        .setStyle(ButtonStyle.Secondary)
+    );
+  }
+  return row;
+}
+
+async function handleQuickBuy(interaction, itemKey) {
+  await interaction.deferReply({ ephemeral: true });
+  try {
+    const idempotencyKey = `shop-quickbuy:${interaction.id}`;
+    const { wallet, item, totalPrice } = await itemService.buyItem({
+      guildId: interaction.guildId,
+      userId: interaction.user.id,
+      itemKey,
+      quantity: 1,
+      idempotencyKey,
+    });
+
+    let body =
+      `**${item.name}**\n` +
+      `Списано: **${totalPrice.toLocaleString('ru-RU')}** ${icon(item.currency)}\n\n` +
+      `Баланс: **${wallet[item.currency].toLocaleString('ru-RU')}** ${icon(item.currency)}`;
+    let color = config.colors.success;
+
+    if (item.category === 'role') {
+      try {
+        const role = await roleAutomationService.ensureRole({
+          guild: interaction.guild,
+          roleId: item.roleId,
+          name: item.discordRoleName || item.name,
+          color: item.discordRoleColor,
+        });
+        if (!item.roleId || item.roleId !== role.id) {
+          await Item.updateOne({ guildId: interaction.guildId, key: itemKey }, { $set: { roleId: role.id } });
+        }
+        await interaction.member.roles.add(role);
+        body += `\n\n✅ Роль ${role} выдана.`;
+      } catch (roleErr) {
+        interaction.client.logger?.error?.('[/shop quickbuy role grant]', roleErr);
+        body += `\n\n⚠️ Монеты списаны, но роль выдать не удалось (не хватает прав у бота или роль выше в иерархии).`;
+        color = config.colors.warning;
+      }
+    }
+
+    const container = new ContainerBuilder().setAccentColor(color);
+    container.addTextDisplayComponents(new TextDisplayBuilder().setContent('-# Покупка\n**Готово**'));
+    container.addSeparatorComponents(new SeparatorBuilder().setDivider(true).setSpacing(SeparatorSpacingSize.Small));
+    container.addTextDisplayComponents(new TextDisplayBuilder().setContent(body));
+
+    await interaction.editReply({ components: [container], flags: MessageFlags.IsComponentsV2 });
+  } catch (err) {
+    if (err instanceof ItemNotFoundError) {
+      await interaction.editReply({ embeds: [errorEmbed('Предмет больше не доступен в магазине.')] });
+      return;
+    }
+    if (err instanceof InsufficientFundsError) {
+      await interaction.editReply({ embeds: [errorEmbed('Недостаточно средств для этой покупки.')] });
+      return;
+    }
+    if (err instanceof DuplicateActionError) {
+      await interaction.editReply({ embeds: [errorEmbed('Эта покупка уже была совершена.')] });
+      return;
+    }
+    interaction.client.logger?.error?.('[/shop quickbuy]', err);
+    await interaction.editReply({ embeds: [errorEmbed()] });
+  }
 }
 
 module.exports = {
@@ -61,7 +161,9 @@ module.exports = {
     try {
       const allItems = await itemService.listShop(interaction.guildId);
       if (allItems.length === 0) {
-        await interaction.editReply({ embeds: [baseEmbed({ title: 'Магазин', description: `Магазин пока пуст.` })] });
+        const empty = new ContainerBuilder().setAccentColor(config.colors.primary);
+        empty.addTextDisplayComponents(new TextDisplayBuilder().setContent('-# Магазин\n**Магазин пока пуст.**'));
+        await interaction.editReply({ components: [empty], flags: MessageFlags.IsComponentsV2 });
         return;
       }
 
@@ -87,33 +189,45 @@ module.exports = {
           )
         );
 
-      const rows = [new ActionRowBuilder().addComponents(categoryMenu), new ActionRowBuilder().addComponents(sortMenu)];
+      function buildRows() {
+        const menuRows = [new ActionRowBuilder().addComponents(categoryMenu), new ActionRowBuilder().addComponents(sortMenu)];
+        const currentItems = allItems.filter((i) => i.category === currentCategory);
+        const buyRow = buildBuyButtonsRow(currentItems, currentSort);
+        return buyRow ? [...menuRows, buyRow] : menuRows;
+      }
 
       const message = await interaction.editReply({
-        embeds: [renderCategory(allItems.filter((i) => i.category === currentCategory), currentCategory, currentSort)],
-        components: rows,
+        components: [renderCategory(allItems.filter((i) => i.category === currentCategory), currentCategory, currentSort), ...buildRows()],
+        flags: MessageFlags.IsComponentsV2,
       });
 
       const collector = message.createMessageComponentCollector({
-        componentType: ComponentType.StringSelect,
         time: 120_000,
         filter: (i) => i.user.id === interaction.user.id,
       });
 
-      collector.on('collect', async (select) => {
-        if (select.customId === 'shop:category') {
-          currentCategory = select.values[0];
-        } else if (select.customId === 'shop:sort') {
-          currentSort = select.values[0];
+      collector.on('collect', async (i) => {
+        if (i.isButton() && i.customId.startsWith('shop:buy:')) {
+          const itemKey = i.customId.split(':')[2];
+          await handleQuickBuy(i, itemKey);
+          return;
         }
 
-        categoryMenu.options.forEach((opt) => opt.setDefault(opt.data.value === currentCategory));
-        sortMenu.options.forEach((opt) => opt.setDefault(opt.data.value === currentSort));
+        if (i.isStringSelectMenu()) {
+          if (i.customId === 'shop:category') {
+            currentCategory = i.values[0];
+          } else if (i.customId === 'shop:sort') {
+            currentSort = i.values[0];
+          }
 
-        await select.update({
-          embeds: [renderCategory(allItems.filter((i) => i.category === currentCategory), currentCategory, currentSort)],
-          components: rows,
-        });
+          categoryMenu.options.forEach((opt) => opt.setDefault(opt.data.value === currentCategory));
+          sortMenu.options.forEach((opt) => opt.setDefault(opt.data.value === currentSort));
+
+          await i.update({
+            components: [renderCategory(allItems.filter((it) => it.category === currentCategory), currentCategory, currentSort), ...buildRows()],
+            flags: MessageFlags.IsComponentsV2,
+          });
+        }
       });
 
       collector.on('end', () => {

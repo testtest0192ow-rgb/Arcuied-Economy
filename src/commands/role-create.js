@@ -1,8 +1,17 @@
-const { SlashCommandBuilder, PermissionFlagsBits } = require('discord.js');
+const {
+  SlashCommandBuilder,
+  PermissionFlagsBits,
+  ContainerBuilder,
+  SeparatorBuilder,
+  SeparatorSpacingSize,
+  TextDisplayBuilder,
+  MessageFlags,
+} = require('discord.js');
 const PersonalRole = require('../models/PersonalRole');
 const { roleAutomationService } = require('../services/RoleAutomationService');
 const { transactionService, InsufficientFundsError, DuplicateActionError } = require('../services/TransactionService');
-const { baseEmbed, errorEmbed, DIVIDER, COIN_ICON } = require('../utils/embeds');
+const { errorEmbed, COIN_ICON } = require('../utils/embeds');
+const config = require('../config');
 
 const PRICE = 3000;
 const REQUIRED_LEVEL = 10;
@@ -53,10 +62,16 @@ module.exports = {
       await PersonalRole.create({ guildId: interaction.guildId, ownerId: interaction.user.id, roleId: role.id, name });
 
       await interaction.editReply({
-        embeds: [baseEmbed({
-          title: 'Роль создана',
-          description: `${DIVIDER}\nВаша личная роль ${role} готова.\nСписано: **${PRICE.toLocaleString('ru-RU')}** ${COIN_ICON}\n\n-# Изменить название можно через /role-manage за отдельную плату.`,
-        })],
+        components: [(() => {
+          const container = new ContainerBuilder().setAccentColor(config.colors.success);
+          container.addTextDisplayComponents(new TextDisplayBuilder().setContent('-# Личная роль\n**Роль создана**'));
+          container.addSeparatorComponents(new SeparatorBuilder().setDivider(true).setSpacing(SeparatorSpacingSize.Small));
+          container.addTextDisplayComponents(new TextDisplayBuilder().setContent(
+            `Ваша личная роль ${role} готова.\nСписано: **${PRICE.toLocaleString('ru-RU')}** ${COIN_ICON}\n\n-# Изменить название можно через /role-manage за отдельную плату.`
+          ));
+          return container;
+        })()],
+        flags: MessageFlags.IsComponentsV2,
       });
     } catch (err) {
       if (err instanceof InsufficientFundsError) {

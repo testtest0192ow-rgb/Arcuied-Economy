@@ -1,13 +1,35 @@
-const { SlashCommandBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType } = require('discord.js');
+const {
+  SlashCommandBuilder,
+  ActionRowBuilder,
+  ButtonBuilder,
+  ButtonStyle,
+  ComponentType,
+  ContainerBuilder,
+  SeparatorBuilder,
+  SeparatorSpacingSize,
+  TextDisplayBuilder,
+  MessageFlags,
+} = require('discord.js');
 const { transactionService } = require('../services/TransactionService');
 const Wallet = require('../models/Wallet');
 const AuditLog = require('../models/AuditLog');
 const { isEconomyAdmin } = require('../services/PermissionService');
-const { baseEmbed, errorEmbed, DIVIDER, COIN_ICON, DONATE_ICON } = require('../utils/embeds');
+const { errorEmbed, COIN_ICON, DONATE_ICON } = require('../utils/embeds');
 const config = require('../config');
+
+// Ephemeral + Components V2 — оба флага живут в одном битовом поле, комбинируем через |.
+const EPHEMERAL_V2 = MessageFlags.IsComponentsV2 | MessageFlags.Ephemeral;
 
 function icon(currency) {
   return currency === 'donateCoins' ? DONATE_ICON : COIN_ICON;
+}
+
+function ecoContainer({ heading, body, color = config.colors.primary }) {
+  const container = new ContainerBuilder().setAccentColor(color);
+  container.addTextDisplayComponents(new TextDisplayBuilder().setContent(`-# Экономика (админ)\n**${heading}**`));
+  container.addSeparatorComponents(new SeparatorBuilder().setDivider(true).setSpacing(SeparatorSpacingSize.Small));
+  container.addTextDisplayComponents(new TextDisplayBuilder().setContent(body));
+  return container;
 }
 
 async function requireAdmin(interaction) {
@@ -16,11 +38,27 @@ async function requireAdmin(interaction) {
   return false;
 }
 
+function describeAction(sub, targetUser, amount, currency) {
+  const cur = currency === 'donateCoins' ? 'донат-монет' : 'монет';
+  switch (sub) {
+    case 'give':
+      return `Начислить **${amount.toLocaleString('ru-RU')}** ${cur} пользователю ${targetUser}.`;
+    case 'remove':
+      return `Списать **${amount.toLocaleString('ru-RU')}** ${cur} у ${targetUser}.`;
+    case 'set':
+      return `Установить баланс (${cur}) пользователя ${targetUser} на **${amount.toLocaleString('ru-RU')}**.`;
+    case 'reset':
+      return `Сбросить весь баланс пользователя ${targetUser} до **0**.`;
+    default:
+      return '';
+  }
+}
+
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('eco')
     .setDescription('Административное управление экономикой')
-    .setDefaultMemberPermissions(0) // hidden from members without any admin-ish permission by default; server-side check still enforced below
+    .setDefaultMemberPermissions(0)
     .addSubcommand((sub) =>
       sub
         .setName('give')
@@ -63,28 +101,27 @@ module.exports = {
       await interaction.deferReply({ ephemeral: true });
       const wallet = await transactionService.getOrCreateWallet(interaction.guildId, targetUser.id);
       await interaction.editReply({
-        embeds: [
-          baseEmbed({
-            title: `Баланс — ${targetUser.username} (админ-просмотр)`,
-            description: `${COIN_ICON} Монеты: **${wallet.coins.toLocaleString('ru-RU')}**\n${DONATE_ICON} Донат-монеты: **${wallet.donateCoins.toLocaleString('ru-RU')}**`,
-          }),
-        ],
+        components: [ecoContainer({
+          heading: `Баланс — ${targetUser.username}`,
+          body: `${COIN_ICON} Монеты: **${wallet.coins.toLocaleString('ru-RU')}**\n${DONATE_ICON} Донат-монеты: **${wallet.donateCoins.toLocaleString('ru-RU')}**`,
+        })],
+        flags: EPHEMERAL_V2,
       });
       return;
     }
 
     const amount = sub === 'reset' ? 0 : interaction.options.getInteger('amount');
 
-    const confirmEmbed = baseEmbed({
-      title: 'Подтвердите действие',
-      description: `${describeAction(sub, targetUser, amount, currency)}`,
-      color: config.colors.warning,
-    });
     const row = new ActionRowBuilder().addComponents(
       new ButtonBuilder().setCustomId('eco:confirm').setLabel('Подтвердить').setStyle(ButtonStyle.Success),
       new ButtonBuilder().setCustomId('eco:cancel').setLabel('Отмена').setStyle(ButtonStyle.Secondary)
     );
-    await interaction.reply({ embeds: [confirmEmbed], components: [row], ephemeral: true });
+    const confirmContainer = ecoContainer({
+      heading: 'Подтвердите действие',
+      body: describeAction(sub, targetUser, amount, currency),
+      color: config.colors.warning,
+    });
+    await interaction.reply({ components: [confirmContainer, row], flags: EPHEMERAL_V2 });
     const message = await interaction.fetchReply();
 
     let choice;
@@ -100,7 +137,7 @@ module.exports = {
     }
 
     if (choice.customId === 'eco:cancel') {
-      await choice.update({ embeds: [baseEmbed({ title: 'Отменено', description: `Действие не выполнено.` })], components: [] });
+      await choice.update({ components: [ecoContainer({ heading: 'Отменено', body: 'Действие не выполнено.', color: config.colors.danger })], flags: EPHEMERAL_V2 });
       return;
     }
     await choice.update({ components: [] });
@@ -143,31 +180,15 @@ module.exports = {
       });
 
       const resultCurrency = sub === 'reset' ? 'coins' : currency;
-      const successEmbed = baseEmbed({
-        title: 'Выполнено',
-        description: `${describeAction(sub, targetUser, amount, currency)}\n\nНовый баланс: **${wallet[resultCurrency].toLocaleString('ru-RU')}** ${icon(resultCurrency)}`,
+      const successContainer = ecoContainer({
+        heading: 'Выполнено',
+        body: `${describeAction(sub, targetUser, amount, currency)}\n\nНовый баланс: **${wallet[resultCurrency].toLocaleString('ru-RU')}** ${icon(resultCurrency)}`,
         color: config.colors.success,
       });
-      await interaction.editReply({ embeds: [successEmbed], components: [] });
+      await interaction.editReply({ components: [successContainer], flags: EPHEMERAL_V2 });
     } catch (err) {
       interaction.client.logger?.error?.('[/eco]', err);
       await interaction.editReply({ embeds: [errorEmbed()], components: [] });
     }
   },
 };
-
-function describeAction(sub, targetUser, amount, currency) {
-  const cur = currency === 'donateCoins' ? 'донат-монет' : 'монет';
-  switch (sub) {
-    case 'give':
-      return `Начислить **${amount.toLocaleString('ru-RU')}** ${cur} пользователю ${targetUser}.`;
-    case 'remove':
-      return `Списать **${amount.toLocaleString('ru-RU')}** ${cur} у ${targetUser}.`;
-    case 'set':
-      return `Установить баланс (${cur}) пользователя ${targetUser} на **${amount.toLocaleString('ru-RU')}**.`;
-    case 'reset':
-      return `Сбросить весь баланс пользователя ${targetUser} до **0**.`;
-    default:
-      return '';
-  }
-}

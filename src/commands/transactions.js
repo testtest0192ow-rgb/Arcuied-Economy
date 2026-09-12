@@ -1,6 +1,14 @@
-const { SlashCommandBuilder } = require('discord.js');
+const {
+  SlashCommandBuilder,
+  ContainerBuilder,
+  SeparatorBuilder,
+  SeparatorSpacingSize,
+  TextDisplayBuilder,
+  MessageFlags,
+} = require('discord.js');
 const { transactionService } = require('../services/TransactionService');
-const { baseEmbed, errorEmbed, DIVIDER, COIN_ICON, DONATE_ICON } = require('../utils/embeds');
+const { errorEmbed, COIN_ICON, DONATE_ICON } = require('../utils/embeds');
+const config = require('../config');
 
 const TYPE_LABELS = {
   give_sent: 'Отправлено',
@@ -18,8 +26,18 @@ const TYPE_LABELS = {
   gift_received: 'Подарок получен',
 };
 
+const EPHEMERAL_V2 = MessageFlags.IsComponentsV2 | MessageFlags.Ephemeral;
+
 function icon(currency) {
   return currency === 'donateCoins' ? DONATE_ICON : COIN_ICON;
+}
+
+function transactionsContainer(body) {
+  const container = new ContainerBuilder().setAccentColor(config.colors.primary);
+  container.addTextDisplayComponents(new TextDisplayBuilder().setContent('-# Личное\n**История операций**'));
+  container.addSeparatorComponents(new SeparatorBuilder().setDivider(true).setSpacing(SeparatorSpacingSize.Small));
+  container.addTextDisplayComponents(new TextDisplayBuilder().setContent(body));
+  return container;
 }
 
 module.exports = {
@@ -31,7 +49,7 @@ module.exports = {
     try {
       const history = await transactionService.getTransactionHistory(interaction.guildId, interaction.user.id, 10);
       if (history.length === 0) {
-        await interaction.editReply({ embeds: [baseEmbed({ title: 'История операций', description: `Пока пусто.` })] });
+        await interaction.editReply({ components: [transactionsContainer('Пока пусто.')], flags: EPHEMERAL_V2 });
         return;
       }
 
@@ -43,7 +61,8 @@ module.exports = {
       });
 
       await interaction.editReply({
-        embeds: [baseEmbed({ title: 'История операций', description: `${lines.join('\n')}\n\n-# Последние 10 операций` })],
+        components: [transactionsContainer(`${lines.join('\n')}\n\n-# Последние 10 операций`)],
+        flags: EPHEMERAL_V2,
       });
     } catch (err) {
       interaction.client.logger?.error?.('[/transactions]', err);

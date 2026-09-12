@@ -1,6 +1,13 @@
-const { SlashCommandBuilder } = require('discord.js');
+const {
+  SlashCommandBuilder,
+  ContainerBuilder,
+  SeparatorBuilder,
+  SeparatorSpacingSize,
+  TextDisplayBuilder,
+  MessageFlags,
+} = require('discord.js');
 const { itemService, ItemNotFoundError, ItemNotUsableError, NotEnoughItemsError } = require('../services/ItemService');
-const { baseEmbed, errorEmbed, DIVIDER } = require('../utils/embeds');
+const { errorEmbed } = require('../utils/embeds');
 const config = require('../config');
 
 module.exports = {
@@ -27,12 +34,12 @@ module.exports = {
         itemKey,
       });
 
-      const embed = baseEmbed({
-        title: 'Предмет использован',
-        description: `**${item.name}** применён.`,
-        color: config.colors.success,
-      });
-      await interaction.editReply({ embeds: [embed] });
+      const container = new ContainerBuilder().setAccentColor(config.colors.success);
+      container.addTextDisplayComponents(new TextDisplayBuilder().setContent('-# Использование\n**Предмет использован**'));
+      container.addSeparatorComponents(new SeparatorBuilder().setDivider(true).setSpacing(SeparatorSpacingSize.Small));
+      container.addTextDisplayComponents(new TextDisplayBuilder().setContent(`**${item.name}** применён.`));
+
+      await interaction.editReply({ components: [container], flags: MessageFlags.IsComponentsV2 });
       // TODO: применить реальный игровой эффект предмета (бустеры и т.д.) — по мере добавления таких предметов.
     } catch (err) {
       if (err instanceof ItemNotFoundError) {

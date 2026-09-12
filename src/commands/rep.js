@@ -1,10 +1,25 @@
-const { SlashCommandBuilder } = require('discord.js');
+const {
+  SlashCommandBuilder,
+  ContainerBuilder,
+  SeparatorBuilder,
+  SeparatorSpacingSize,
+  TextDisplayBuilder,
+  MessageFlags,
+} = require('discord.js');
 const Wallet = require('../models/Wallet');
 const { transactionService } = require('../services/TransactionService');
-const { baseEmbed, errorEmbed, DIVIDER } = require('../utils/embeds');
+const { errorEmbed } = require('../utils/embeds');
 const config = require('../config');
 
 const REP_COOLDOWN_HOURS = 24;
+
+function repContainer({ heading, body, color = config.colors.success }) {
+  const container = new ContainerBuilder().setAccentColor(color);
+  container.addTextDisplayComponents(new TextDisplayBuilder().setContent(`-# Репутация\n**${heading}**`));
+  container.addSeparatorComponents(new SeparatorBuilder().setDivider(true).setSpacing(SeparatorSpacingSize.Small));
+  container.addTextDisplayComponents(new TextDisplayBuilder().setContent(body));
+  return container;
+}
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -30,7 +45,7 @@ module.exports = {
 
     const cutoff = new Date(Date.now() - REP_COOLDOWN_HOURS * 60 * 60 * 1000);
 
-    // Atomic: only proceeds if the giver's cooldown has passed — prevents rep-farming via double-click.
+    // Атомарно: проходит, только если у выдающего кулдаун истёк — защита от накрутки двойным кликом.
     const giverWallet = await Wallet.findOneAndUpdate(
       { guildId: interaction.guildId, userId: interaction.user.id, $or: [{ lastRepGivenAt: null }, { lastRepGivenAt: { $lte: cutoff } }] },
       { $set: { lastRepGivenAt: new Date() } },
@@ -52,13 +67,8 @@ module.exports = {
     );
 
     await interaction.editReply({
-      embeds: [
-        baseEmbed({
-          title: 'Репутация выдана',
-          description: `${targetUser} теперь имеет **${targetWallet.reputation}** репутации.`,
-          color: config.colors.success,
-        }),
-      ],
+      components: [repContainer({ heading: 'Репутация выдана', body: `${targetUser} теперь имеет **${targetWallet.reputation}** репутации.` })],
+      flags: MessageFlags.IsComponentsV2,
     });
   },
 };

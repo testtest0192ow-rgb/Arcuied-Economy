@@ -1,9 +1,25 @@
-const { SlashCommandBuilder } = require('discord.js');
+const {
+  SlashCommandBuilder,
+  ContainerBuilder,
+  SeparatorBuilder,
+  SeparatorSpacingSize,
+  TextDisplayBuilder,
+  MessageFlags,
+} = require('discord.js');
 const PersonalRole = require('../models/PersonalRole');
 const { transactionService, InsufficientFundsError, DuplicateActionError } = require('../services/TransactionService');
-const { baseEmbed, errorEmbed, DIVIDER, COIN_ICON } = require('../utils/embeds');
+const { errorEmbed, COIN_ICON } = require('../utils/embeds');
+const config = require('../config');
 
 const RENAME_PRICE = 1500;
+
+function roleContainer({ heading, body, color = config.colors.success }) {
+  const container = new ContainerBuilder().setAccentColor(color);
+  container.addTextDisplayComponents(new TextDisplayBuilder().setContent(`-# Личная роль\n**${heading}**`));
+  container.addSeparatorComponents(new SeparatorBuilder().setDivider(true).setSpacing(SeparatorSpacingSize.Small));
+  container.addTextDisplayComponents(new TextDisplayBuilder().setContent(body));
+  return container;
+}
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -56,10 +72,8 @@ module.exports = {
         await personalRole.save();
 
         await interaction.editReply({
-          embeds: [baseEmbed({
-            title: 'Роль переименована',
-            description: `${DIVIDER}\nТеперь ваша роль называется ${role}.\nСписано: **${RENAME_PRICE.toLocaleString('ru-RU')}** ${COIN_ICON}`,
-          })],
+          components: [roleContainer({ heading: 'Роль переименована', body: `Теперь ваша роль называется ${role}.\nСписано: **${RENAME_PRICE.toLocaleString('ru-RU')}** ${COIN_ICON}` })],
+          flags: MessageFlags.IsComponentsV2,
         });
       } catch (err) {
         if (err instanceof InsufficientFundsError) {
@@ -78,20 +92,20 @@ module.exports = {
     if (sub === 'hide') {
       try {
         if (personalRole.hidden) {
-          // Была скрыта — возвращаем роль на участника.
           await interaction.member.roles.add(role);
           personalRole.hidden = false;
           await personalRole.save();
           await interaction.editReply({
-            embeds: [baseEmbed({ title: 'Роль снова видна', description: `${DIVIDER}\n${role} возвращена вам.` })],
+            components: [roleContainer({ heading: 'Роль снова видна', body: `${role} возвращена вам.` })],
+            flags: MessageFlags.IsComponentsV2,
           });
         } else {
-          // Снимаем роль с участника, но запись владения сохраняется — можно вернуть в любой момент.
           await interaction.member.roles.remove(role);
           personalRole.hidden = true;
           await personalRole.save();
           await interaction.editReply({
-            embeds: [baseEmbed({ title: 'Роль скрыта', description: `${DIVIDER}\n${role} снята с вас, но остаётся вашей. Верните её через /role-manage hide ещё раз.` })],
+            components: [roleContainer({ heading: 'Роль скрыта', body: `${role} снята с вас, но остаётся вашей. Верните её через /role-manage hide ещё раз.`, color: config.colors.warning })],
+            flags: MessageFlags.IsComponentsV2,
           });
         }
       } catch (err) {

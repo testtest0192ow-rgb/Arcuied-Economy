@@ -1,13 +1,28 @@
-const { SlashCommandBuilder } = require('discord.js');
+const {
+  SlashCommandBuilder,
+  ContainerBuilder,
+  SeparatorBuilder,
+  SeparatorSpacingSize,
+  TextDisplayBuilder,
+  MessageFlags,
+} = require('discord.js');
 const { itemService, ItemNotFoundError } = require('../services/ItemService');
 const { transactionService, InsufficientFundsError, DuplicateActionError } = require('../services/TransactionService');
 const { roleAutomationService } = require('../services/RoleAutomationService');
 const Item = require('../models/Item');
-const { baseEmbed, errorEmbed, DIVIDER, COIN_ICON, DONATE_ICON } = require('../utils/embeds');
+const { errorEmbed, COIN_ICON, DONATE_ICON } = require('../utils/embeds');
 const config = require('../config');
 
 function icon(currency) {
   return currency === 'donateCoins' ? DONATE_ICON : COIN_ICON;
+}
+
+function buyContainer({ heading, body, color = config.colors.primary }) {
+  const container = new ContainerBuilder().setAccentColor(color);
+  container.addTextDisplayComponents(new TextDisplayBuilder().setContent(`-# Покупка\n**${heading}**`));
+  container.addSeparatorComponents(new SeparatorBuilder().setDivider(true).setSpacing(SeparatorSpacingSize.Small));
+  container.addTextDisplayComponents(new TextDisplayBuilder().setContent(body));
+  return container;
 }
 
 module.exports = {
@@ -52,15 +67,13 @@ module.exports = {
         idempotencyKey,
       });
 
-      const embed = baseEmbed({
-        title: 'Покупка совершена',
-        description:
-          `` +
-          `**${item.name}** × ${quantity}\n` +
-          `Списано: **${totalPrice.toLocaleString('ru-RU')}** ${icon(item.currency)}\n\n` +
-          `Баланс: **${wallet[item.currency].toLocaleString('ru-RU')}** ${icon(item.currency)}`,
-        color: config.colors.success,
-      });
+      // Копим текст и цвет по ходу, контейнер собираем один раз в конце —
+      // Components V2 не даёт дописывать content после создания так же удобно, как embed.data.description.
+      let body =
+        `**${item.name}** × ${quantity}\n` +
+        `Списано: **${totalPrice.toLocaleString('ru-RU')}** ${icon(item.currency)}\n\n` +
+        `Баланс: **${wallet[item.currency].toLocaleString('ru-RU')}** ${icon(item.currency)}`;
+      let color = config.colors.success;
 
       // Роль из магазина ролей — выдаём реальную Discord-роль после успешной оплаты.
       if (item.category === 'role') {
@@ -75,15 +88,15 @@ module.exports = {
             await Item.updateOne({ guildId: interaction.guildId, key: itemKey }, { $set: { roleId: role.id } });
           }
           await interaction.member.roles.add(role);
-          embed.data.description += `\n\n✅ Роль ${role} выдана.`;
+          body += `\n\n✅ Роль ${role} выдана.`;
         } catch (roleErr) {
           interaction.client.logger?.error?.('[/buy role grant]', roleErr);
-          embed.data.description += `\n\n⚠️ Монеты списаны, но роль выдать не удалось (не хватает прав у бота или роль выше в иерархии). Обратитесь к администратору сервера.`;
-          embed.setColor(config.colors.warning);
+          body += `\n\n⚠️ Монеты списаны, но роль выдать не удалось (не хватает прав у бота или роль выше в иерархии). Обратитесь к администратору сервера.`;
+          color = config.colors.warning;
         }
       }
 
-      await interaction.editReply({ embeds: [embed] });
+      await interaction.editReply({ components: [buyContainer({ heading: 'Покупка совершена', body, color })], flags: MessageFlags.IsComponentsV2 });
     } catch (err) {
       if (err instanceof ItemNotFoundError) {
         await interaction.editReply({ embeds: [errorEmbed('Такого предмета нет в магазине. Проверьте ключ через /shop.')] });

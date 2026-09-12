@@ -61,7 +61,7 @@ const config = {
     new: process.env.SORT_ICON_NEW || '▦',
   },
   colors: {
-    primary: 0x000000,
+    primary: 0x5c5f66,
     success: 0x57f287,
     danger: 0xed4245,
     warning: 0xfee75c,

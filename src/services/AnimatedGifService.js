@@ -21,7 +21,7 @@ function renderFrames(width, height, frameCount, drawFrame) {
     const { data } = ctx.getImageData(0, 0, width, height);
     const palette = quantize(data, 128);
     const index = applyPalette(data, palette);
-    gif.writeFrame(index, width, height, { palette, delay: 60 });
+    gif.writeFrame(index, width, height, { palette, delay: 60, dispose: 2 });
   }
 
   gif.finish();

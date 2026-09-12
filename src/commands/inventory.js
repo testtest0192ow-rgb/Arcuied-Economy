@@ -1,7 +1,23 @@
-const { SlashCommandBuilder } = require('discord.js');
+const {
+  SlashCommandBuilder,
+  ContainerBuilder,
+  SeparatorBuilder,
+  SeparatorSpacingSize,
+  TextDisplayBuilder,
+  MessageFlags,
+} = require('discord.js');
 const { itemService } = require('../services/ItemService');
 const Item = require('../models/Item');
-const { baseEmbed, errorEmbed, DIVIDER } = require('../utils/embeds');
+const { errorEmbed } = require('../utils/embeds');
+const config = require('../config');
+
+function inventoryContainer({ heading, body }) {
+  const container = new ContainerBuilder().setAccentColor(config.colors.primary);
+  container.addTextDisplayComponents(new TextDisplayBuilder().setContent(`-# Инвентарь\n**${heading}**`));
+  container.addSeparatorComponents(new SeparatorBuilder().setDivider(true).setSpacing(SeparatorSpacingSize.Small));
+  container.addTextDisplayComponents(new TextDisplayBuilder().setContent(body));
+  return container;
+}
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -17,7 +33,8 @@ module.exports = {
       const entries = await itemService.getInventory(interaction.guildId, targetUser.id);
       if (entries.length === 0) {
         await interaction.editReply({
-          embeds: [baseEmbed({ title: `Инвентарь — ${targetUser.username}`, description: `Пусто.` })],
+          components: [inventoryContainer({ heading: targetUser.username, body: 'Пусто.' })],
+          flags: MessageFlags.IsComponentsV2,
         });
         return;
       }
@@ -36,13 +53,14 @@ module.exports = {
         byCategory[category].push(`**${item?.name || entry.itemKey}** × ${entry.quantity}`);
       }
 
-      const description =
-        `` +
-        Object.entries(byCategory)
-          .map(([category, lines]) => `__${category}__\n${lines.join('\n')}`)
-          .join('\n\n');
+      const body = Object.entries(byCategory)
+        .map(([category, lines]) => `__${category}__\n${lines.join('\n')}`)
+        .join('\n\n');
 
-      await interaction.editReply({ embeds: [baseEmbed({ title: `Инвентарь — ${targetUser.username}`, description })] });
+      await interaction.editReply({
+        components: [inventoryContainer({ heading: targetUser.username, body })],
+        flags: MessageFlags.IsComponentsV2,
+      });
     } catch (err) {
       interaction.client.logger?.error?.('[/inventory]', err);
       await interaction.editReply({ embeds: [errorEmbed()] });

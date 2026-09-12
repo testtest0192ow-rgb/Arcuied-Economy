@@ -1,6 +1,14 @@
-const { SlashCommandBuilder } = require('discord.js');
+const {
+  SlashCommandBuilder,
+  ContainerBuilder,
+  SeparatorBuilder,
+  SeparatorSpacingSize,
+  TextDisplayBuilder,
+  MessageFlags,
+} = require('discord.js');
 const { mogBattleService } = require('../services/MogBattleService');
-const { baseEmbed, errorEmbed, DIVIDER } = require('../utils/embeds');
+const { errorEmbed } = require('../utils/embeds');
+const config = require('../config');
 
 const MEDALS = ['🥇', '🥈', '🥉'];
 
@@ -12,8 +20,14 @@ module.exports = {
 
     try {
       const top = await mogBattleService.getTop(interaction.guildId, 10);
+
+      const container = new ContainerBuilder().setAccentColor(config.colors.primary);
+      container.addTextDisplayComponents(new TextDisplayBuilder().setContent('-# Mog Battle\n**Топ по победам**'));
+      container.addSeparatorComponents(new SeparatorBuilder().setDivider(true).setSpacing(SeparatorSpacingSize.Small));
+
       if (top.length === 0) {
-        await interaction.editReply({ embeds: [baseEmbed({ title: 'Топ Mog Battle', description: `Пока никто не побеждал.` })] });
+        container.addTextDisplayComponents(new TextDisplayBuilder().setContent('Пока никто не побеждал.'));
+        await interaction.editReply({ components: [container], flags: MessageFlags.IsComponentsV2 });
         return;
       }
 
@@ -24,8 +38,9 @@ module.exports = {
           return `${place} ${user ? user.username : w.userId} — **${w.mogWins}** побед (${w.mogLosses} поражений)`;
         })
       );
+      container.addTextDisplayComponents(new TextDisplayBuilder().setContent(lines.join('\n')));
 
-      await interaction.editReply({ embeds: [baseEmbed({ title: 'Топ Mog Battle', description: `${lines.join('\n')}` })] });
+      await interaction.editReply({ components: [container], flags: MessageFlags.IsComponentsV2 });
     } catch (err) {
       interaction.client.logger?.error?.('[/mogtop]', err);
       await interaction.editReply({ embeds: [errorEmbed()] });
