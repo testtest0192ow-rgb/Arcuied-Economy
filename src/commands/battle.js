@@ -62,10 +62,10 @@ module.exports = {
 
     const inviteContainer = battleContainer({
       heading: 'Вызов на сравнение профилей',
-      body: `${interaction.user} вызывает ${targetUser} на Mog Battle!`,
+      body: `${targetUser}\n${interaction.user} вызывает ${targetUser} на Mog Battle!`,
     });
 
-    const message = await interaction.reply({ content: `${targetUser}`, components: [inviteContainer, row], flags: MessageFlags.IsComponentsV2, fetchReply: true });
+    const message = await interaction.reply({ components: [inviteContainer, row], flags: MessageFlags.IsComponentsV2, fetchReply: true });
     await mogBattleService.attachMessage(battle._id, { messageId: message.id, channelId: message.channelId });
 
     let choice;
