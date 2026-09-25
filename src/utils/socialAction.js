@@ -1,4 +1,4 @@
-const { SlashCommandBuilder } = require('discord.js');
+const { SlashCommandBuilder, MessageFlags } = require('discord.js');
 const { fetchAnimeGif } = require('../services/AnimeGifService');
 const { baseEmbed, errorEmbed, DIVIDER } = require('../utils/embeds');
 
@@ -22,7 +22,7 @@ function createSocialActionCommand({ name, description, category, message, selfM
 
       if (targetUser.id === interaction.user.id) {
         if (!selfMessage) {
-          await interaction.reply({ embeds: [errorEmbed('Придётся найти кого-то другого.')], ephemeral: true });
+          await interaction.reply({ embeds: [errorEmbed('Придётся найти кого-то другого.')], flags: MessageFlags.Ephemeral });
           return;
         }
         await interaction.reply({ embeds: [baseEmbed({ description: `${DIVIDER}\n${selfMessage.replace('{user}', `${interaction.user}`)}` })] });

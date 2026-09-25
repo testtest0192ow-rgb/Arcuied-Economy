@@ -91,7 +91,7 @@ function buildBuyButtonsRow(items, sort) {
 }
 
 async function handleQuickBuy(interaction, itemKey) {
-  await interaction.deferReply({ ephemeral: true });
+  await interaction.deferReply({ flags: MessageFlags.Ephemeral });
   try {
     const idempotencyKey = `shop-quickbuy:${interaction.id}`;
     const { wallet, item, totalPrice } = await itemService.buyItem({

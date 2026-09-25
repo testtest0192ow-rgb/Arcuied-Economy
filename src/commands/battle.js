@@ -10,6 +10,7 @@ const {
   TextDisplayBuilder,
   MessageFlags,
 } = require('discord.js');
+const { appEmoji } = require('../utils/appEmoji');
 const crypto = require('crypto');
 const { mogBattleService } = require('../services/MogBattleService');
 const { errorEmbed } = require('../utils/embeds');
@@ -24,7 +25,7 @@ const COMMENTS_CLEAR = ['Уверенная победа по всем стат�
 
 function battleContainer({ heading, body, color = config.colors.primary }) {
   const container = new ContainerBuilder().setAccentColor(color);
-  container.addTextDisplayComponents(new TextDisplayBuilder().setContent(`-# Mog Battle\n**${heading}**`));
+  container.addTextDisplayComponents(new TextDisplayBuilder().setContent(`-# ${appEmoji('versus')}Mog Battle\n**${heading}**`));
   container.addSeparatorComponents(new SeparatorBuilder().setDivider(true).setSpacing(SeparatorSpacingSize.Small));
   container.addTextDisplayComponents(new TextDisplayBuilder().setContent(body));
   return container;
@@ -40,11 +41,11 @@ module.exports = {
     const targetUser = interaction.options.getUser('user');
 
     if (targetUser.id === interaction.user.id) {
-      await interaction.reply({ embeds: [errorEmbed('Нельзя вызвать самого себя.')], ephemeral: true });
+      await interaction.reply({ embeds: [errorEmbed('Нельзя вызвать самого себя.')], flags: MessageFlags.Ephemeral });
       return;
     }
     if (targetUser.bot) {
-      await interaction.reply({ embeds: [errorEmbed('Ботов вызывать нечестно.')], ephemeral: true });
+      await interaction.reply({ embeds: [errorEmbed('Ботов вызывать нечестно.')], flags: MessageFlags.Ephemeral });
       return;
     }
 
@@ -60,12 +61,20 @@ module.exports = {
       new ButtonBuilder().setCustomId(`battle:cancel:${battle._id}`).setLabel('Отменить').setStyle(ButtonStyle.Secondary)
     );
 
+    // Пинг targetUser переехал внутрь тела контейнера — поле "content" нельзя
+    // использовать вместе с MessageFlags.IsComponentsV2 (Discord API отклоняет
+    // весь запрос с ошибкой 50035 "Invalid Form Body"), но упоминание внутри
+    // TextDisplayBuilder всё равно кликабельно и присылает уведомление.
     const inviteContainer = battleContainer({
       heading: 'Вызов на сравнение профилей',
       body: `${targetUser}\n${interaction.user} вызывает ${targetUser} на Mog Battle!`,
     });
 
-    const message = await interaction.reply({ components: [inviteContainer, row], flags: MessageFlags.IsComponentsV2, fetchReply: true });
+    await interaction.reply({
+      components: [inviteContainer, row],
+      flags: MessageFlags.IsComponentsV2,
+    });
+    const message = await interaction.fetchReply();
     await mogBattleService.attachMessage(battle._id, { messageId: message.id, channelId: message.channelId });
 
     let choice;
@@ -78,7 +87,6 @@ module.exports = {
     } catch {
       await mogBattleService.expire(battle._id);
       await interaction.editReply({
-        content: null,
         components: [battleContainer({ heading: 'Время истекло', body: 'Вызов не был принят вовремя.', color: config.colors.danger })],
         flags: MessageFlags.IsComponentsV2,
       });
@@ -88,7 +96,6 @@ module.exports = {
     if (choice.customId.includes(':cancel:')) {
       await mogBattleService.cancelOwnPending({ guildId: interaction.guildId, challengerId: interaction.user.id });
       await choice.update({
-        content: null,
         components: [battleContainer({ heading: 'Отменено', body: 'Вызов отменён.', color: config.colors.danger })],
         flags: MessageFlags.IsComponentsV2,
       });
@@ -98,7 +105,6 @@ module.exports = {
     if (choice.customId.includes(':decline:')) {
       await mogBattleService.decline(battle._id);
       await choice.update({
-        content: null,
         components: [battleContainer({ heading: 'Отклонено', body: `${targetUser} отклонил(а) вызов.`, color: config.colors.danger })],
         flags: MessageFlags.IsComponentsV2,
       });
@@ -106,7 +112,7 @@ module.exports = {
     }
 
     // action === accept
-    await choice.update({ content: null, components: [] });
+    await choice.update({ components: [] });
 
     try {
       const [memberA, memberB] = await Promise.all([

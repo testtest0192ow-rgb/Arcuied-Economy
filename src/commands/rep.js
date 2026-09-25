@@ -6,6 +6,7 @@ const {
   TextDisplayBuilder,
   MessageFlags,
 } = require('discord.js');
+const { appEmoji } = require('../utils/appEmoji');
 const Wallet = require('../models/Wallet');
 const { transactionService } = require('../services/TransactionService');
 const { errorEmbed } = require('../utils/embeds');
@@ -15,7 +16,7 @@ const REP_COOLDOWN_HOURS = 24;
 
 function repContainer({ heading, body, color = config.colors.success }) {
   const container = new ContainerBuilder().setAccentColor(color);
-  container.addTextDisplayComponents(new TextDisplayBuilder().setContent(`-# Репутация\n**${heading}**`));
+  container.addTextDisplayComponents(new TextDisplayBuilder().setContent(`-# ${appEmoji('reputation')}Репутация\n**${heading}**`));
   container.addSeparatorComponents(new SeparatorBuilder().setDivider(true).setSpacing(SeparatorSpacingSize.Small));
   container.addTextDisplayComponents(new TextDisplayBuilder().setContent(body));
   return container;

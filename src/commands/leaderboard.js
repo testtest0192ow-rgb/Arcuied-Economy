@@ -9,6 +9,7 @@ const {
   TextDisplayBuilder,
   MessageFlags,
 } = require('discord.js');
+const { appEmoji } = require('../utils/appEmoji');
 const Wallet = require('../models/Wallet');
 const { errorEmbed, COIN_ICON } = require('../utils/embeds');
 const config = require('../config');
@@ -17,7 +18,7 @@ const MEDALS = ['🥇', '🥈', '🥉'];
 
 function leaderboardContainer(heading, body) {
   const container = new ContainerBuilder().setAccentColor(config.colors.primary);
-  container.addTextDisplayComponents(new TextDisplayBuilder().setContent(`-# Рейтинг сервера\n**${heading}**`));
+  container.addTextDisplayComponents(new TextDisplayBuilder().setContent(`-# ${appEmoji('leaderboard')}Рейтинг сервера\n**${heading}**`));
   container.addSeparatorComponents(new SeparatorBuilder().setDivider(true).setSpacing(SeparatorSpacingSize.Small));
   container.addTextDisplayComponents(new TextDisplayBuilder().setContent(body));
   return container;

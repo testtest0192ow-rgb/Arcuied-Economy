@@ -12,4 +12,13 @@ function isEconomyAdmin(interaction) {
   return interaction.memberPermissions?.has(PermissionsBitField.Flags.Administrator) ?? false;
 }
 
-module.exports = { isEconomyAdmin };
+/**
+ * Strict check — TRUE only for config.botOwnerId, unlike isEconomyAdmin which also
+ * lets any server Administrator through. Use this for commands that must stay
+ * invisible/unusable even to server admins (e.g. manually granting levels).
+ */
+function isBotOwner(interaction) {
+  return Boolean(config.botOwnerId) && interaction.user.id === config.botOwnerId;
+}
+
+module.exports = { isEconomyAdmin, isBotOwner };

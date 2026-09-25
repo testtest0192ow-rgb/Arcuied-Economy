@@ -10,6 +10,7 @@ const {
   TextDisplayBuilder,
   MessageFlags,
 } = require('discord.js');
+const { appEmoji } = require('../utils/appEmoji');
 const { giftService, GiftNotFoundError, GiftAlreadyClaimedError } = require('../services/GiftService');
 const { guessGiftService, RoundNotOpenError, AlreadyGuessedError, CannotGuessOwnGiftError } = require('../services/GuessGiftService');
 const { InsufficientFundsError, DuplicateActionError } = require('../services/TransactionService');
@@ -29,7 +30,7 @@ function icon(currency) {
 // Общий паттерн Components V2 для всех сообщений этой команды.
 function giftsContainer({ heading, body, color = config.colors.primary }) {
   const container = new ContainerBuilder().setAccentColor(color);
-  container.addTextDisplayComponents(new TextDisplayBuilder().setContent(`-# Подарки\n**${heading}**`));
+  container.addTextDisplayComponents(new TextDisplayBuilder().setContent(`-# ${appEmoji('gift')}Подарки\n**${heading}**`));
   container.addSeparatorComponents(new SeparatorBuilder().setDivider(true).setSpacing(SeparatorSpacingSize.Small));
   container.addTextDisplayComponents(new TextDisplayBuilder().setContent(body));
   return container;
@@ -192,22 +193,22 @@ async function handleHide(interaction) {
           return;
         }
 
-        await buttonInteraction.reply({ embeds: [errorEmbed('Мимо! В этом подарке ничего не было (попытка потрачена).')], ephemeral: true });
+        await buttonInteraction.reply({ embeds: [errorEmbed('Мимо! В этом подарке ничего не было (попытка потрачена).')], flags: MessageFlags.Ephemeral });
       } catch (err) {
         if (err instanceof CannotGuessOwnGiftError) {
-          await buttonInteraction.reply({ embeds: [errorEmbed('Нельзя угадывать свой же подарок.')], ephemeral: true });
+          await buttonInteraction.reply({ embeds: [errorEmbed('Нельзя угадывать свой же подарок.')], flags: MessageFlags.Ephemeral });
           return;
         }
         if (err instanceof AlreadyGuessedError) {
-          await buttonInteraction.reply({ embeds: [errorEmbed('Вы уже пробовали в этом раунде.')], ephemeral: true });
+          await buttonInteraction.reply({ embeds: [errorEmbed('Вы уже пробовали в этом раунде.')], flags: MessageFlags.Ephemeral });
           return;
         }
         if (err instanceof RoundNotOpenError) {
-          await buttonInteraction.reply({ embeds: [errorEmbed('Этот раунд уже завершён.')], ephemeral: true });
+          await buttonInteraction.reply({ embeds: [errorEmbed('Этот раунд уже завершён.')], flags: MessageFlags.Ephemeral });
           return;
         }
         interaction.client.logger?.error?.('[/gifts hide guess]', err);
-        await buttonInteraction.reply({ embeds: [errorEmbed()], ephemeral: true });
+        await buttonInteraction.reply({ embeds: [errorEmbed()], flags: MessageFlags.Ephemeral });
       }
     });
 
@@ -257,7 +258,7 @@ module.exports = {
 
   async execute(interaction) {
     const sub = interaction.options.getSubcommand();
-    await interaction.deferReply({ ephemeral: true });
+    await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
     if (sub === 'send') return handleSend(interaction);
     if (sub === 'hide') return handleHide(interaction);
@@ -280,20 +281,19 @@ module.exports = {
 
       await interaction.followUp({
         components: [giftsContainer({ heading: 'Подарок открыт', body, color: config.colors.success })],
-        flags: MessageFlags.IsComponentsV2,
-        ephemeral: true,
+        flags: MessageFlags.IsComponentsV2 | MessageFlags.Ephemeral,
       });
     } catch (err) {
       if (err instanceof GiftAlreadyClaimedError) {
-        await interaction.followUp({ embeds: [errorEmbed('Этот подарок уже открыт.')], ephemeral: true });
+        await interaction.followUp({ embeds: [errorEmbed('Этот подарок уже открыт.')], flags: MessageFlags.Ephemeral });
         return;
       }
       if (err instanceof GiftNotFoundError) {
-        await interaction.followUp({ embeds: [errorEmbed('Подарок не найден.')], ephemeral: true });
+        await interaction.followUp({ embeds: [errorEmbed('Подарок не найден.')], flags: MessageFlags.Ephemeral });
         return;
       }
       interaction.client.logger?.error?.('[/gifts open]', err);
-      await interaction.followUp({ embeds: [errorEmbed()], ephemeral: true });
+      await interaction.followUp({ embeds: [errorEmbed()], flags: MessageFlags.Ephemeral });
     }
   },
 };

@@ -40,18 +40,25 @@ class RelationshipService {
   }
 
   async accept({ relationshipId, userId }) {
-    const rel = await Relationship.findOne({ _id: relationshipId, status: 'pending' });
-    if (!rel) throw new ProposalNotFoundError();
-    if (rel.userBId !== userId) throw new ProposalNotFoundError();
+    const pending = await Relationship.findOne({ _id: relationshipId, status: 'pending' });
+    if (!pending) throw new ProposalNotFoundError();
+    if (pending.userBId !== userId) throw new ProposalNotFoundError();
 
     // Re-check neither side married someone else in the meantime.
-    const existingA = await this.getActiveMarriage(rel.guildId, rel.userAId);
-    const existingB = await this.getActiveMarriage(rel.guildId, rel.userBId);
+    const existingA = await this.getActiveMarriage(pending.guildId, pending.userAId);
+    const existingB = await this.getActiveMarriage(pending.guildId, pending.userBId);
     if (existingA || existingB) throw new AlreadyMarriedError();
 
-    rel.status = 'married';
-    rel.marriedAt = new Date();
-    await rel.save();
+    // Атомарно: findOneAndUpdate с фильтром status:'pending' — если кто-то другой
+    // успел принять/отклонить этот же proposal между проверкой выше и этим вызовом,
+    // filter не совпадёт ни с одним документом и rel будет null (вместо того чтобы
+    // findOne+save молча перезаписали статус поверх уже изменённого состояния).
+    const rel = await Relationship.findOneAndUpdate(
+      { _id: relationshipId, status: 'pending' },
+      { status: 'married', marriedAt: new Date() },
+      { new: true }
+    );
+    if (!rel) throw new ProposalNotFoundError();
     return rel;
   }
 

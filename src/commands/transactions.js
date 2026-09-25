@@ -44,7 +44,7 @@ module.exports = {
   data: new SlashCommandBuilder().setName('transactions').setDescription('История ваших операций'),
 
   async execute(interaction) {
-    await interaction.deferReply({ ephemeral: true });
+    await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
     try {
       const history = await transactionService.getTransactionHistory(interaction.guildId, interaction.user.id, 10);

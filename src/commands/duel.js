@@ -13,6 +13,7 @@ const {
   MediaGalleryItemBuilder,
   MessageFlags,
 } = require('discord.js');
+const { appEmoji } = require('../utils/appEmoji');
 const { duelService, DuelNotPendingError, DuelAlreadyTakenError } = require('../services/DuelService');
 const { transactionService, InsufficientFundsError } = require('../services/TransactionService');
 const { questService } = require('../services/QuestService');
@@ -25,7 +26,7 @@ const config = require('../config');
 // Серый акцент по умолчанию, зелёный/красный только на реальном исходе (победа/отмена).
 function duelContainer({ heading, body, color = config.colors.primary }) {
   const container = new ContainerBuilder().setAccentColor(color);
-  container.addTextDisplayComponents(new TextDisplayBuilder().setContent(`-# Дуэль\n**${heading}**`));
+  container.addTextDisplayComponents(new TextDisplayBuilder().setContent(`-# ${appEmoji('duel')}Дуэль\n**${heading}**`));
   container.addSeparatorComponents(new SeparatorBuilder().setDivider(true).setSpacing(SeparatorSpacingSize.Small));
   container.addTextDisplayComponents(new TextDisplayBuilder().setContent(body));
   return container;
@@ -82,7 +83,7 @@ module.exports = {
 
     if (action === 'cancel') {
       if (choice.user.id !== interaction.user.id) {
-        await choice.reply({ content: 'Только тот, кто открыл дуэль, может её отменить.', ephemeral: true });
+        await choice.reply({ content: 'Только тот, кто открыл дуэль, может её отменить.', flags: MessageFlags.Ephemeral });
         return;
       }
       await duelService.cancelDuel(duel._id);
@@ -100,7 +101,7 @@ module.exports = {
         const reason = choice.user.id === interaction.user.id
           ? 'Нельзя принять свой же вызов.'
           : 'Кто-то уже принял эту дуэль раньше вас.';
-        await choice.reply({ embeds: [errorEmbed(reason)], ephemeral: true });
+        await choice.reply({ embeds: [errorEmbed(reason)], flags: MessageFlags.Ephemeral });
         return;
       }
       throw err;

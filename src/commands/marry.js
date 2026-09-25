@@ -10,6 +10,7 @@ const {
   TextDisplayBuilder,
   MessageFlags,
 } = require('discord.js');
+const { appEmoji } = require('../utils/appEmoji');
 const {
   relationshipService,
   AlreadyMarriedError,
@@ -20,7 +21,7 @@ const config = require('../config');
 
 function marryContainer({ heading, body, color = config.colors.primary }) {
   const container = new ContainerBuilder().setAccentColor(color);
-  container.addTextDisplayComponents(new TextDisplayBuilder().setContent(`-# Отношения\n**${heading}**`));
+  container.addTextDisplayComponents(new TextDisplayBuilder().setContent(`-# ${appEmoji('ring')}Отношения\n**${heading}**`));
   container.addSeparatorComponents(new SeparatorBuilder().setDivider(true).setSpacing(SeparatorSpacingSize.Small));
   container.addTextDisplayComponents(new TextDisplayBuilder().setContent(body));
   return container;
@@ -75,11 +76,11 @@ module.exports = {
     }
 
     if (targetUser.id === interaction.user.id) {
-      await interaction.reply({ embeds: [errorEmbed('Нельзя сделать предложение самому себе.')], ephemeral: true });
+      await interaction.reply({ embeds: [errorEmbed('Нельзя сделать предложение самому себе.')], flags: MessageFlags.Ephemeral });
       return;
     }
     if (targetUser.bot) {
-      await interaction.reply({ embeds: [errorEmbed('Нельзя сделать предложение боту.')], ephemeral: true });
+      await interaction.reply({ embeds: [errorEmbed('Нельзя сделать предложение боту.')], flags: MessageFlags.Ephemeral });
       return;
     }
     try {
@@ -96,10 +97,11 @@ module.exports = {
 
       const inviteContainer = marryContainer({
         heading: 'Предложение руки и сердца',
-        body: `${interaction.user} делает предложение ${targetUser}!`,
+        body: `${targetUser}\n${interaction.user} делает предложение ${targetUser}!`,
       });
 
-      const message = await interaction.reply({ content: `${targetUser}`, components: [inviteContainer, row], flags: MessageFlags.IsComponentsV2, fetchReply: true });
+      await interaction.reply({ components: [inviteContainer, row], flags: MessageFlags.IsComponentsV2 });
+      const message = await interaction.fetchReply();
       let choice;
       try {
         choice = await message.awaitMessageComponent({
@@ -109,7 +111,6 @@ module.exports = {
         });
       } catch {
         await interaction.editReply({
-          content: null,
           components: [marryContainer({ heading: 'Время истекло', body: 'Предложение не было принято вовремя.', color: config.colors.danger })],
           flags: MessageFlags.IsComponentsV2,
         });
@@ -118,7 +119,6 @@ module.exports = {
 
       if (choice.customId.startsWith('marry:decline')) {
         await choice.update({
-          content: null,
           components: [marryContainer({ heading: 'Отклонено', body: `${targetUser} отклонил(а) предложение.`, color: config.colors.danger })],
           flags: MessageFlags.IsComponentsV2,
         });
@@ -128,7 +128,6 @@ module.exports = {
       try {
         await relationshipService.accept({ relationshipId: proposal._id, userId: targetUser.id });
         await choice.update({
-          content: null,
           components: [marryContainer({ heading: 'Поздравляем!', body: `${interaction.user} и ${targetUser} теперь в браке. 💍`, color: config.colors.success })],
           flags: MessageFlags.IsComponentsV2,
         });
@@ -141,11 +140,11 @@ module.exports = {
       }
     } catch (err) {
       if (err instanceof AlreadyMarriedError) {
-        await interaction.reply({ embeds: [errorEmbed('Один из вас уже состоит в браке.')], ephemeral: true });
+        await interaction.reply({ embeds: [errorEmbed('Один из вас уже состоит в браке.')], flags: MessageFlags.Ephemeral });
         return;
       }
       interaction.client.logger?.error?.('[/marry]', err);
-      await interaction.reply({ embeds: [errorEmbed()], ephemeral: true });
+      await interaction.reply({ embeds: [errorEmbed()], flags: MessageFlags.Ephemeral });
     }
   },
 };

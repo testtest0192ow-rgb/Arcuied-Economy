@@ -1,4 +1,4 @@
-const { SlashCommandBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType, AttachmentBuilder } = require('discord.js');
+const { SlashCommandBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType, AttachmentBuilder, MessageFlags } = require('discord.js');
 const { transactionService } = require('../services/TransactionService');
 const { relationshipService } = require('../services/RelationshipService');
 const { levelService } = require('../services/LevelService');
@@ -88,7 +88,7 @@ module.exports = {
             title: 'Любовный профиль',
             description: `${DIVIDER}\n<@${userAId}> 💍 <@${userBId}>\nВместе с <t:${Math.floor(new Date(marriage.marriedAt).getTime() / 1000)}:D> (<t:${Math.floor(new Date(marriage.marriedAt).getTime() / 1000)}:R>).`,
           });
-          await buttonInteraction.reply({ embeds: [loveEmbed], ephemeral: true });
+          await buttonInteraction.reply({ embeds: [loveEmbed], flags: MessageFlags.Ephemeral });
         });
       }
     } catch (err) {

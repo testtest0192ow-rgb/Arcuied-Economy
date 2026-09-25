@@ -12,6 +12,7 @@ const {
   MediaGalleryItemBuilder,
   MessageFlags,
 } = require('discord.js');
+const { appEmoji } = require('../utils/appEmoji');
 const { duelService, DuelNotPendingError, DuelAlreadyTakenError } = require('../services/DuelService');
 const { transactionService, InsufficientFundsError } = require('../services/TransactionService');
 const { questService } = require('../services/QuestService');
@@ -26,7 +27,7 @@ const formatRoll = (values) => values.map((v) => DICE_FACES[v] || v).join(' ');
 // серая подпись-категория ("-# Кости") + жирный заголовок + Separator + текст.
 function diceContainer({ heading, body, color = config.colors.primary }) {
   const container = new ContainerBuilder().setAccentColor(color);
-  container.addTextDisplayComponents(new TextDisplayBuilder().setContent(`-# Кости\n**${heading}**`));
+  container.addTextDisplayComponents(new TextDisplayBuilder().setContent(`-# ${appEmoji('dice')}Кости\n**${heading}**`));
   container.addSeparatorComponents(new SeparatorBuilder().setDivider(true).setSpacing(SeparatorSpacingSize.Small));
   container.addTextDisplayComponents(new TextDisplayBuilder().setContent(body));
   return container;
@@ -80,7 +81,7 @@ module.exports = {
 
     if (action === 'cancel') {
       if (choice.user.id !== interaction.user.id) {
-        await choice.reply({ content: 'Только тот, кто предложил игру, может её отменить.', ephemeral: true });
+        await choice.reply({ content: 'Только тот, кто предложил игру, может её отменить.', flags: MessageFlags.Ephemeral });
         return;
       }
       await duelService.cancelDuel(duel._id);
@@ -97,7 +98,7 @@ module.exports = {
         const reason = choice.user.id === interaction.user.id
           ? 'Нельзя принять свою же игру.'
           : 'Кто-то уже принял эту игру раньше вас.';
-        await choice.reply({ embeds: [errorEmbed(reason)], ephemeral: true });
+        await choice.reply({ embeds: [errorEmbed(reason)], flags: MessageFlags.Ephemeral });
         return;
       }
       throw err;

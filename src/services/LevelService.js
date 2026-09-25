@@ -25,6 +25,13 @@ function levelForXp(totalXp) {
   return level;
 }
 
+/** Суммарный XP, нужный, чтобы ДОЙТИ ровно до начала указанного level'а (с нуля). */
+function xpAtLevelStart(level) {
+  let total = 0;
+  for (let i = 0; i < level; i++) total += xpForLevel(i);
+  return total;
+}
+
 class LevelService {
   /**
    * Начисляет XP и, если это подняло уровень, выдаёт/меняет роль по прогрессивным
@@ -61,6 +68,38 @@ class LevelService {
     });
 
     return { wallet: after, leveledUp: true, oldLevel, newLevel };
+  }
+
+  /**
+   * Владельческая команда: жёстко выставляет уровень пользователю (XP переносится
+   * к началу этого уровня — прогресс внутри уровня сбрасывается в 0, чтобы прогресс-бар
+   * на /profile не показывал нечестные значения). Синхронизирует роль-порог, как addXp.
+   * Возвращает { wallet, oldLevel, newLevel }.
+   */
+  async setLevel({ guild, userId, level }) {
+    if (!Number.isInteger(level) || level < 0) {
+      throw new RangeError('level должен быть целым числом >= 0');
+    }
+    const guildId = guild.id;
+    const before = await Wallet.findOneAndUpdate(
+      { guildId, userId },
+      { $setOnInsert: { guildId, userId } },
+      { upsert: true, new: true }
+    );
+    const oldLevel = before.level || 0;
+
+    const targetXp = xpAtLevelStart(level);
+    const after = await Wallet.findOneAndUpdate(
+      { guildId, userId },
+      { $set: { xp: targetXp, level } },
+      { new: true }
+    );
+
+    await this._syncLevelRole(guild, userId, level).catch((err) => {
+      guild.client.logger?.error?.('[LevelService] Не удалось синхронизировать роль по уровню', err);
+    });
+
+    return { wallet: after, oldLevel, newLevel: level };
   }
 
   /** Держит только одну (самую старшую положенную) роль-порог на участнике. */

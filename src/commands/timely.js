@@ -6,6 +6,7 @@ const {
   TextDisplayBuilder,
   MessageFlags,
 } = require('discord.js');
+const { appEmoji } = require('../utils/appEmoji');
 const { transactionService, TimelyOnCooldownError } = require('../services/TransactionService');
 const { errorEmbed, COIN_ICON } = require('../utils/embeds');
 const config = require('../config');
@@ -21,7 +22,7 @@ function formatTimeLeft(ms) {
 
 function timelyContainer({ heading, body, color = config.colors.primary }) {
   const container = new ContainerBuilder().setAccentColor(color);
-  container.addTextDisplayComponents(new TextDisplayBuilder().setContent(`-# Ежедневная награда\n**${heading}**`));
+  container.addTextDisplayComponents(new TextDisplayBuilder().setContent(`-# ${appEmoji('timely')}Периодическая награда\n**${heading}**`));
   container.addSeparatorComponents(new SeparatorBuilder().setDivider(true).setSpacing(SeparatorSpacingSize.Small));
   container.addTextDisplayComponents(new TextDisplayBuilder().setContent(body));
   return container;

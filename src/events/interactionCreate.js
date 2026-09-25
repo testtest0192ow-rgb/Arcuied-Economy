@@ -1,3 +1,4 @@
+const { MessageFlags } = require('discord.js');
 const { errorEmbed } = require('../utils/embeds');
 
 module.exports = {
@@ -43,7 +44,7 @@ module.exports = {
         if (interaction.deferred || interaction.replied) {
           await interaction.editReply(payload);
         } else {
-          await interaction.reply({ ...payload, ephemeral: true });
+          await interaction.reply({ ...payload, flags: MessageFlags.Ephemeral });
         }
       } catch {
         // Interaction may already be invalid (expired token) — nothing more we can do.

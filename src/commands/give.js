@@ -37,11 +37,11 @@ module.exports = {
     const amount = interaction.options.getInteger('amount');
 
     if (targetUser.id === interaction.user.id) {
-      await interaction.reply({ embeds: [errorEmbed('Нельзя передать монеты самому себе.')], ephemeral: true });
+      await interaction.reply({ embeds: [errorEmbed('Нельзя передать монеты самому себе.')], flags: MessageFlags.Ephemeral });
       return;
     }
     if (targetUser.bot) {
-      await interaction.reply({ embeds: [errorEmbed('Нельзя передать монеты боту.')], ephemeral: true });
+      await interaction.reply({ embeds: [errorEmbed('Нельзя передать монеты боту.')], flags: MessageFlags.Ephemeral });
       return;
     }
 

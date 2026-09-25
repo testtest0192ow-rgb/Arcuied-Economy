@@ -6,6 +6,7 @@ const {
   TextDisplayBuilder,
   MessageFlags,
 } = require('discord.js');
+const { appEmoji } = require('../utils/appEmoji');
 const { itemService } = require('../services/ItemService');
 const Item = require('../models/Item');
 const { errorEmbed } = require('../utils/embeds');
@@ -13,7 +14,7 @@ const config = require('../config');
 
 function inventoryContainer({ heading, body }) {
   const container = new ContainerBuilder().setAccentColor(config.colors.primary);
-  container.addTextDisplayComponents(new TextDisplayBuilder().setContent(`-# Инвентарь\n**${heading}**`));
+  container.addTextDisplayComponents(new TextDisplayBuilder().setContent(`-# ${appEmoji('inventory')}Инвентарь\n**${heading}**`));
   container.addSeparatorComponents(new SeparatorBuilder().setDivider(true).setSpacing(SeparatorSpacingSize.Small));
   container.addTextDisplayComponents(new TextDisplayBuilder().setContent(body));
   return container;

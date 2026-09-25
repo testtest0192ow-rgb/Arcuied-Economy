@@ -1,4 +1,4 @@
-const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
+const { SlashCommandBuilder, EmbedBuilder, MessageFlags } = require('discord.js');
 const config = require('../config');
 
 module.exports = {
@@ -14,7 +14,7 @@ module.exports = {
     if (!fullUser.banner) {
       await interaction.reply({
         embeds: [new EmbedBuilder().setColor(config.colors.warning).setDescription(`У ${fullUser.username} нет установленного баннера.`)],
-        ephemeral: true,
+        flags: MessageFlags.Ephemeral,
       });
       return;
     }

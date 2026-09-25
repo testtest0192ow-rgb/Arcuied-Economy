@@ -14,7 +14,7 @@ module.exports = {
   data: new SlashCommandBuilder().setName('mogcancel').setDescription('Отменить свой ожидающий вызов на Mog Battle'),
 
   async execute(interaction) {
-    await interaction.deferReply({ ephemeral: true });
+    await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
     try {
       await mogBattleService.cancelOwnPending({ guildId: interaction.guildId, challengerId: interaction.user.id });

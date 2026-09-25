@@ -34,7 +34,7 @@ function ecoContainer({ heading, body, color = config.colors.primary }) {
 
 async function requireAdmin(interaction) {
   if (isEconomyAdmin(interaction)) return true;
-  await interaction.reply({ embeds: [errorEmbed('Недостаточно прав для этой команды.')], ephemeral: true });
+  await interaction.reply({ embeds: [errorEmbed('Недостаточно прав для этой команды.')], flags: MessageFlags.Ephemeral });
   return false;
 }
 
@@ -98,7 +98,7 @@ module.exports = {
     const currency = interaction.options.getString('currency') || 'coins';
 
     if (sub === 'balance') {
-      await interaction.deferReply({ ephemeral: true });
+      await interaction.deferReply({ flags: MessageFlags.Ephemeral });
       const wallet = await transactionService.getOrCreateWallet(interaction.guildId, targetUser.id);
       await interaction.editReply({
         components: [ecoContainer({
