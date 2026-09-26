@@ -9,7 +9,7 @@ const { baseEmbed, errorEmbed, DIVIDER, COIN_ICON, DONATE_ICON } = require('../u
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('profile')
-    .setDescription('Посмотреть профиль')
+    .setDescription('Показать профиль участника')
     .addUserOption((opt) => opt.setName('user').setDescription('Чей профиль посмотреть').setRequired(false)),
 
   async execute(interaction) {

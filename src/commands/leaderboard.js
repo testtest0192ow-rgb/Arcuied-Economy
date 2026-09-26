@@ -64,7 +64,7 @@ const CATEGORIES = {
 };
 
 module.exports = {
-  data: new SlashCommandBuilder().setName('leaderboard').setDescription('Открыть рейтинг сервера'),
+  data: new SlashCommandBuilder().setName('leaderboard').setDescription('Показать таблицу лидеров'),
 
   async execute(interaction) {
     await interaction.deferReply();

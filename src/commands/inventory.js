@@ -23,7 +23,7 @@ function inventoryContainer({ heading, body }) {
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('inventory')
-    .setDescription('Посмотреть инвентарь')
+    .setDescription('Открыть инвентарь')
     .addUserOption((opt) => opt.setName('user').setDescription('Чей инвентарь посмотреть').setRequired(false)),
 
   async execute(interaction) {

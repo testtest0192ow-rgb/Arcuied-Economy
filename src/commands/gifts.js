@@ -240,7 +240,7 @@ async function handleHide(interaction) {
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('gifts')
-    .setDescription('Подарки')
+    .setDescription('Подарки и социальные действия')
     .addSubcommand((sub) =>
       sub
         .setName('send')

@@ -25,7 +25,7 @@ function repContainer({ heading, body, color = config.colors.success }) {
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('rep')
-    .setDescription('Выдать репутацию пользователю')
+    .setDescription('Изменить репутацию участника')
     .addUserOption((opt) => opt.setName('user').setDescription('Кому').setRequired(true)),
 
   async execute(interaction) {

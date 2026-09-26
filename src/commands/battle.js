@@ -34,7 +34,7 @@ function battleContainer({ heading, body, color = config.colors.primary }) {
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('battle')
-    .setDescription('Вызвать на сравнение профиля (Mog Battle)')
+    .setDescription('Сравнить профиль с участником')
     .addUserOption((opt) => opt.setName('user').setDescription('С кем сравнить').setRequired(true)),
 
   async execute(interaction) {

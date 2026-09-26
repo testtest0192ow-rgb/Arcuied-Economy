@@ -30,7 +30,7 @@ function marryContainer({ heading, body, color = config.colors.primary }) {
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('marry')
-    .setDescription('Предложить брак или посмотреть отношения')
+    .setDescription('Социальные отношения')
     .addUserOption((opt) => opt.setName('user').setDescription('Кому сделать предложение').setRequired(false))
     .addBooleanOption((opt) => opt.setName('divorce').setDescription('Развестись').setRequired(false)),
 

@@ -36,7 +36,7 @@ function diceContainer({ heading, body, color = config.colors.primary }) {
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('dice')
-    .setDescription('Открыть кости на ставку — первый, кто примет, сыграет 2 кубика против 2 кубиков')
+    .setDescription('Сыграть в кости без ставок')
     .addIntegerOption((opt) => opt.setName('ставка').setDescription('Ставка').setRequired(true).setMinValue(1)),
 
   async execute(interaction) {

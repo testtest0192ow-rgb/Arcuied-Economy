@@ -153,7 +153,7 @@ async function handleQuickBuy(interaction, itemKey) {
 }
 
 module.exports = {
-  data: new SlashCommandBuilder().setName('shop').setDescription('Открыть магазин'),
+  data: new SlashCommandBuilder().setName('shop').setDescription('Открыть магазин сервера'),
 
   async execute(interaction) {
     await interaction.deferReply();

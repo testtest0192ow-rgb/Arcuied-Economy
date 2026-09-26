@@ -1,0 +1,3 @@
+const { SlashCommandBuilder } = require('discord.js');
+const { container, nav, V2 } = require('../ui/CommandUI');
+module.exports={data:new SlashCommandBuilder().setName('help').setDescription('Открыть меню ARCUEID'),async execute(i){await i.reply({components:[container('ARCUEID',`**Экономика**\n/balance · /give · /timely · /transactions\n\n**Прогресс**\n/profile · /leaderboard · /stats · /rep\n\n**Предметы**\n/shop · /inventory · /gifts\n\n**Социальное**\n/marry · /duel · /dice · /battle\n\n**Сообщество**\n/clan · /banner\n\n-# Все операции с валютой проходят через единый TransactionService.`),nav('help',[{id:'economy',label:'Экономика'},{id:'profile',label:'Профиль'},{id:'games',label:'Игры'}])],flags:V2});}};

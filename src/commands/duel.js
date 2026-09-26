@@ -35,7 +35,7 @@ function duelContainer({ heading, body, color = config.colors.primary }) {
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('duel')
-    .setDescription('Открыть дуэль на ставку — первый, кто примет, сыграет')
+    .setDescription('Бросить вызов участнику')
     .addIntegerOption((opt) => opt.setName('ставка').setDescription('Ставка').setRequired(true).setMinValue(1)),
 
   async execute(interaction) {
