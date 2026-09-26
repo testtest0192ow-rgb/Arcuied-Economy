@@ -1,71 +1,9 @@
-require('dotenv').config();
-
-function requireEnv(name) {
-  const value = process.env[name];
-  if (!value || value.trim() === '') {
-    throw new Error(`Отсутствует обязательная переменная окружения: ${name}. Проверь .env (см. .env.example).`);
-  }
-  return value;
-}
-
-// Парсит "url1,url2,url3" в массив, отбрасывая пустые элементы. Пусто/не задано -> [].
-function parseGifList(name) {
-  const raw = process.env[name] || '';
-  return raw
-    .split(',')
-    .map((s) => s.trim())
-    .filter(Boolean);
-}
-
-function pickRandom(list) {
-  if (!list || list.length === 0) return null;
-  return list[Math.floor(Math.random() * list.length)];
-}
-
-const config = {
-  discordToken: requireEnv('DISCORD_TOKEN'),
-  clientId: requireEnv('DISCORD_CLIENT_ID'),
-  mongodbUri: requireEnv('MONGODB_URI'),
-  // Не список конкретных серверов — просто максимум, сколько серверов одновременно
-  // бот может обслуживать. Можно добавлять его куда угодно, лишь бы не больше лимита.
-  maxGuilds: Number(process.env.MAX_GUILDS || 10),
-  botOwnerId: process.env.BOT_OWNER_ID || null,
-  timelyCooldownHours: Number(process.env.TIMELY_COOLDOWN_HOURS || 12),
-  // Комиссия на /give в процентах — списывается сверх суммы перевода и просто
-  // уходит из экономики (не начисляется никому), как у конкурентов.
-  giveFeePercent: Number(process.env.GIVE_FEE_PERCENT || 2),
-  assets: {
-    // Гифки результата /coinflip — показываются в зависимости от того, что реально
-    // выпало (не от того, что выбрал игрок). Можно указать несколько через запятую
-    // в .env — тогда каждый раз выбирается случайная из списка.
-    coinflipHeadsGifUrls: parseGifList('COINFLIP_HEADS_GIF_URL'),
-    coinflipTailsGifUrls: parseGifList('COINFLIP_TAILS_GIF_URL'),
-    // GIF для стадии "Дуэль началась". Слева всегда challenger (тот, кто вызвал),
-    // справа всегда opponent (кого вызвали) — так и в embed, и в самой гифке.
-    // Можно указать несколько через запятую — выбирается случайная.
-    duelGifUrls: parseGifList('DUEL_GIF_URL'),
-    // Гифки результата /dice — можно указать несколько через запятую, выбирается случайная.
-    diceGifUrls: parseGifList('DICE_GIF_URL'),
-    pickRandomGif: pickRandom,
-  },
-  // Белые кастомные иконки для select-меню (сортировка в /shop и т.п.). По умолчанию
-  // используются обычные текстовые символы (★ ↓ ↑ ▦), которые Discord рендерит
-  // плоским белым/серым цветом текста — НЕ цветными emoji-картинками, поэтому
-  // никаких загрузок на сервер не требуется. Если позже захочешь именно свои
-  // нарисованные иконки — залей их как custom emoji и впиши ID сюда в формате
-  // <:name:ID>, тогда они заменят символы по умолчанию.
-  sortIcons: {
-    popular: process.env.SORT_ICON_POPULAR || '★',
-    cheap: process.env.SORT_ICON_CHEAP || '↓',
-    expensive: process.env.SORT_ICON_EXPENSIVE || '↑',
-    new: process.env.SORT_ICON_NEW || '▦',
-  },
-  colors: {
-    primary: 0x5c5f66,
-    success: 0x57f287,
-    danger: 0xed4245,
-    warning: 0xfee75c,
-  },
+module.exports={
+  colors:{primary:0xE9E9EC,success:0x72D6A1,warning:0xE8C66D,danger:0xE47A7A,muted:0x7F858F,dark:0x111216},
+  economy:{startingCoins:250,startingDonateCoins:0,transferFeePercent:2,maxTransfer:1_000_000_000,timelyBase:50,timelyStep:25,timelyMax:250,timelyCooldownMs:24*60*60*1000,messageReward:2,messageCooldownMs:45_000},
+  progression:{baseXp:100,growth:1.18,messageXp:4,voiceXpPerMinute:2},
+  quests:{dailyCount:3,refreshMs:24*60*60*1000},
+  social:{repCooldownMs:12*60*60*1000},
+  clans:{maxMembers:25,createCost:3000},
+  ui:{maxLeaderboard:10}
 };
-
-module.exports = config;

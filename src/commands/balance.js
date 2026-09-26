@@ -1,6 +1,1 @@
-const { SlashCommandBuilder } = require('discord.js');
-const { transactionService } = require('../services/TransactionService');
-const { container, money, V2 } = require('../ui/CommandUI');
-const { fail } = require('../utils/commandGuard');
-const { appEmoji } = require('../utils/appEmoji');
-module.exports = { data: new SlashCommandBuilder().setName('balance').setDescription('Показать баланс'), async execute(i) { try { const w = await transactionService.getOrCreateWallet(i.guildId, i.user.id); const body = `${appEmoji('coin')}**Монеты**  ${money(w.coins)}\n${appEmoji('donate')}**Донат**  ${money(w.donateCoins)}\n\n-# Баланс хранится отдельно для каждого сервера.`; await i.reply({ components:[container('Баланс', body,{eyebrow:'ARCUEID · ECONOMY'})], flags:V2 }); } catch(e){ i.client.logger?.error?.('[/balance]',e); await fail(i,'Баланс временно недоступен.'); } } };
+const {SlashCommandBuilder}=require('discord.js');const ws=require('../services/WalletService');const {container,v2}=require('../utils/ui');const {money}=require('../utils/format');module.exports={data:new SlashCommandBuilder().setName('balance').setDescription('Показать баланс').addUserOption(o=>o.setName('user').setDescription('Участник').setRequired(false)),async execute(i){const u=i.options.getUser('user')||i.user,w=await ws.get(i.guildId,u.id);return i.reply({flags:v2(),components:[container('Баланс',`### ${u.globalName||u.username}\n\n**${money(w.coins)}** монет\n**${money(w.donateCoins)}** донат\n\n-# Уровень ${w.level} • ${money(w.xp)} XP`)]});}};

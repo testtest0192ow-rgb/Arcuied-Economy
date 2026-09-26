@@ -1,7 +1,1 @@
-module.exports = {
-  name: 'ready',
-  once: true,
-  execute(client) {
-    client.logger.log(`[ready] Вошёл как ${client.user.tag}. Серверов: ${client.guilds.cache.size}.`);
-  },
-};
+module.exports={name:'ready',once:true,async execute(client){client.logger.info(`[ARCUEID] ${client.user.tag} online`);client.user.setActivity('/help • ARCUEID PRIME',{type:0});}};

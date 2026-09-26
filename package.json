@@ -1,23 +1,10 @@
 {
-  "name": "arcueid-economy",
-  "version": "0.1.0",
-  "description": "ARCUEID Economy + Core bot",
-  "main": "src/index.js",
-  "type": "commonjs",
-  "scripts": {
-    "start": "node src/index.js",
-    "deploy-commands": "node src/deploy-commands.js",
-    "clear-global-commands": "node src/clear-global-commands.js",
-    "upload-app-emoji": "node src/upload-app-emoji.js"
-  },
-  "dependencies": {
-    "discord.js": "^14.16.3",
-    "mongoose": "^8.7.0",
-    "dotenv": "^16.4.5",
-    "@napi-rs/canvas": "^0.1.53",
-    "gifenc": "^1.0.3"
-  },
-  "engines": {
-    "node": ">=18.0.0"
-  }
+  "name":"arcuied-prime",
+  "version":"3.0.0",
+  "private":true,
+  "description":"ARCUEID PRIME — Discord economy, profiles, quests, clans, social systems and non-wager games.",
+  "main":"index.js",
+  "scripts":{"start":"node index.js","dev":"node --watch index.js","check":"node --check index.js && find src scripts -name '*.js' -print0 | xargs -0 -n1 node --check","deploy":"node scripts/deploy-commands.js","seed":"node scripts/seed-shop.js"},
+  "engines":{"node":">=20"},
+  "dependencies":{"@napi-rs/canvas":"^0.1.80","discord.js":"^14.26.2","dotenv":"^16.6.1","mongoose":"^8.18.0"}
 }

@@ -1,27 +1,4 @@
-const { Schema, model } = require('mongoose');
-
-const walletSchema = new Schema(
-  {
-    guildId: { type: String, required: true, index: true },
-    userId: { type: String, required: true, index: true },
-    coins: { type: Number, required: true, default: 0, min: 0 },
-    donateCoins: { type: Number, required: true, default: 0, min: 0 },
-    lastTimelyAt: { type: Date, default: null },
-    timelyStreak: { type: Number, default: 0 },
-    duelWins: { type: Number, default: 0 },
-    duelLosses: { type: Number, default: 0 },
-    mogWins: { type: Number, default: 0 },
-    mogLosses: { type: Number, default: 0 },
-    reputation: { type: Number, default: 0 },
-    lastRepGivenAt: { type: Date, default: null }, // cooldown lives on the GIVER's wallet
-    messageCount: { type: Number, default: 0 },
-    xp: { type: Number, default: 0 },
-    level: { type: Number, default: 0 },
-  },
-  { timestamps: true }
-);
-
-// A user has exactly one wallet per guild.
-walletSchema.index({ guildId: 1, userId: 1 }, { unique: true });
-
-module.exports = model('Wallet', walletSchema);
+const {Schema,model}=require('mongoose');
+const schema=new Schema({guildId:{type:String,index:true},userId:{type:String,index:true},coins:{type:Number,min:0,default:250},donateCoins:{type:Number,min:0,default:0},xp:{type:Number,min:0,default:0},level:{type:Number,min:1,default:1},messages:{type:Number,min:0,default:0},voiceMinutes:{type:Number,min:0,default:0},timelyStreak:{type:Number,min:0,default:0},lastTimelyAt:{type:Date,default:null},lastMessageRewardAt:{type:Date,default:null},stats:{wins:{type:Number,default:0},losses:{type:Number,default:0},draws:{type:Number,default:0},duels:{type:Number,default:0}}},{timestamps:true});
+schema.index({guildId:1,userId:1},{unique:true});schema.index({guildId:1,coins:-1});schema.index({guildId:1,level:-1,xp:-1});
+module.exports=model('Wallet',schema);

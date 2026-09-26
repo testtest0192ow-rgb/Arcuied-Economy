@@ -1,0 +1,2 @@
+const {Schema,model}=require('mongoose');
+const schema=new Schema({guildId:{type:String,index:true},userId:{type:String,index:true},bio:{type:String,default:''},hiddenRole:{type:Boolean,default:false},reputation:{type:Number,default:0},lastRepAt:{type:Date,default:null},clanId:{type:Schema.Types.ObjectId,ref:'Clan',default:null},createdAt:{type:Date,default:Date.now}},{timestamps:true});schema.index({guildId:1,userId:1},{unique:true});schema.index({guildId:1,reputation:-1});module.exports=model('Profile',schema);

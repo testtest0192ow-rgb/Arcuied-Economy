@@ -1,0 +1,2 @@
+const {Schema,model}=require('mongoose');
+const schema=new Schema({guildId:{type:String,index:true},name:{type:String,trim:true},tag:{type:String,trim:true},ownerId:String,members:[String],treasury:{type:Number,min:0,default:0},level:{type:Number,min:1,default:1},xp:{type:Number,min:0,default:0},description:{type:String,default:''}},{timestamps:true});schema.index({guildId:1,name:1},{unique:true});schema.index({guildId:1,treasury:-1});module.exports=model('Clan',schema);
