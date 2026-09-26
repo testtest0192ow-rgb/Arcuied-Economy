@@ -12,13 +12,12 @@
     "seed": "node scripts/seed-shop.js"
   },
   "engines": {
-    "node": ">=20"
+    "node": "22.x"
   },
   "dependencies": {
     "@napi-rs/canvas": "^0.1.80",
     "discord.js": "^14.26.2",
     "dotenv": "^16.6.1",
-    "gifenc": "^1.0.3",
     "mongoose": "^8.18.0"
   }
 }
