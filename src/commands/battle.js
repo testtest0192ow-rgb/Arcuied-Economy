@@ -112,7 +112,7 @@ module.exports = {
     }
 
     // action === accept
-    await choice.update({ components: [] });
+    await choice.deferUpdate(); // подтверждаем клик без пустого components:[] (иначе Discord 50006 "empty message")
 
     try {
       const [memberA, memberB] = await Promise.all([

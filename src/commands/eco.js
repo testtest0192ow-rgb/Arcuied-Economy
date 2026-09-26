@@ -140,7 +140,7 @@ module.exports = {
       await choice.update({ components: [ecoContainer({ heading: 'Отменено', body: 'Действие не выполнено.', color: config.colors.danger })], flags: EPHEMERAL_V2 });
       return;
     }
-    await choice.update({ components: [] });
+    await choice.deferUpdate(); // подтверждаем клик без пустого components:[] (иначе Discord 50006 "empty message")
 
     try {
       let wallet;

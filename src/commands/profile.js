@@ -2,6 +2,7 @@ const { SlashCommandBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, Compo
 const { transactionService } = require('../services/TransactionService');
 const { relationshipService } = require('../services/RelationshipService');
 const { levelService } = require('../services/LevelService');
+const { questService, WEEKLY_TASKS } = require('../services/QuestService');
 const { renderProfileCard } = require('../services/ProfileCardService');
 const { baseEmbed, errorEmbed, DIVIDER, COIN_ICON, DONATE_ICON } = require('../utils/embeds');
 
@@ -20,6 +21,16 @@ module.exports = {
       const wallet = await transactionService.getOrCreateWallet(interaction.guildId, targetUser.id);
       const { currentXp, neededXp } = levelService.progressWithinLevel(wallet.xp || 0);
       const marriage = await relationshipService.getActiveMarriage(interaction.guildId, targetUser.id);
+      const questDoc = await questService.getProgress(interaction.guildId, targetUser.id);
+      const quests = {
+        allClaimed: questDoc.claimed,
+        tasks: WEEKLY_TASKS.map((t) => ({
+          label: t.label,
+          current: questDoc[t.key] || 0,
+          target: t.target,
+          done: (questDoc[t.key] || 0) >= t.target,
+        })),
+      };
 
       let partnerUsername = null;
       if (marriage) {
@@ -55,6 +66,7 @@ module.exports = {
             neededXp,
             title: null, // TODO: подключить, когда появится система титулов
             partnerUsername,
+            quests,
           },
           interaction.client.logger
         );
